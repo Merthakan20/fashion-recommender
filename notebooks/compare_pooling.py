@@ -95,8 +95,8 @@ def pair_rank(names, ranks):
     return np.mean(positions), positions
 
 
-def save_showcase(paths, names, all_ranks):
-    OUT_DIR.mkdir(exist_ok=True)
+def save_showcase(paths, names, all_ranks, out_dir=OUT_DIR):
+    out_dir.mkdir(exist_ok=True)
     for query in SHOWCASE:
         qi = names.index(query)
         fig, axes = plt.subplots(len(all_ranks), TOP_N + 1, figsize=(2.2 * (TOP_N + 1), 2.6 * len(all_ranks)))
@@ -111,7 +111,7 @@ def save_showcase(paths, names, all_ranks):
                     ax.set_ylabel(method, fontsize=11, fontweight="bold")
         fig.suptitle(f"Sorgu: {query}", fontsize=12)
         fig.tight_layout()
-        fig.savefig(OUT_DIR / f"{Path(query).stem}.png", dpi=80)
+        fig.savefig(out_dir / f"{Path(query).stem}.png", dpi=80)
         plt.close(fig)
 
 

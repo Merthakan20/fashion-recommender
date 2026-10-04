@@ -80,7 +80,7 @@ fashion-recommender/
 
 ### Aşama 5 — Model iyileştirmeleri (isteğe bağlı)
 - [x] `pooling='avg'` ile vektörü 25.088 → 512 boyuta indir; kaliteyi karşılaştır → belirgin kazanç yok, **flatten kalıyor** (`notebooks/compare_pooling.py`)
-- [ ] ResNet50 / EfficientNet / CLIP karşılaştırması
+- [x] ResNet50 / EfficientNet / CLIP karşılaştırması → CLIP (ViT-B/32, ViT-B/16) denendi, görselden görsele net üstünlük yok; ResNet/EfficientNet atlandı (`notebooks/compare_models.py`)
 - [ ] CLIP ile metinden arama (ör. "kırmızı payetli elbise")
 - [x] Birkaç örnek görsel için önerileri yan yana kaydedip gözle değerlendirme (`notebooks/pooling_comparison/`; yeni modeller eklendikçe genişletilecek)
 
@@ -93,7 +93,7 @@ fashion-recommender/
 |---|---|---|---|
 | Web arayüzü | Streamlit / Gradio | Streamlit | Streamlit |
 | Ortam | conda / venv | conda (Anaconda zaten kurulu) | conda (`fashion-rec`) |
-| Model | VGG16 / ResNet50 / CLIP | Önce VGG16, Aşama 5'te karşılaştır | VGG16, flatten (havuzlama karşılaştırması sonrası); CLIP denenecek |
+| Model | VGG16 / ResNet50 / CLIP | Önce VGG16, Aşama 5'te karşılaştır | Görselden görsele: VGG16 flatten. Metinden arama: CLIP ViT-B/32 (entegrasyon kararı bekliyor) |
 | Kopya görseller | sil / bırak | — | — (3 neredeyse aynı çift bulundu, bkz. notlar) |
 | Sürüm kontrolü | git var / yok | git | git |
 
@@ -116,3 +116,14 @@ fashion-recommender/
 
   Farklar küçük ve örnek az (11 etnik sorgu, 8 eş sırası); yöntemler ilk 5'te ortalama yalnızca ~2 görselde anlaşıyor. Gözle bakınca flatten payet/doku benzerliğinde (ör. "sparkling black dress") açıkça daha iyi; havuzlama konumu kaybettiği için desenli ama alakasız elbiseler getiriyor. 96 görselde boyut (9,6 MB → 0,2 MB) önemsiz. **Karar: flatten kalıyor.** Üç yöntem de renk tutarlılığında zayıf (≈0,2) — asıl iyileşme için CLIP denenmeli.
   Benzerlikle bulunan neredeyse aynı görseller (cosine > 0,8): `blue dress with a floral pattern` ↔ `l-htdrss7133-honky-tonky…` (0,92), `Sleeveless-Ruched-…-Club-Dresses` ↔ `fitted, off-the-shoulder white dress with horizontal ribbed texture` (0,91), `Latest-Party-Wear-One-Piece-Gown…` ↔ `long, flowing dress with a full skirt` (0,83). Sıradaki adım: **CLIP karşılaştırması**.
+- **2026-10-04** — Havuzlama karşılaştırması commit edildi (`88a3be1`). `open_clip_torch` 3.3.0 (torch 2.14.1) ortama kuruldu (henüz `requirements.txt`'te değil). `notebooks/compare_models.py` ile VGG16 ve CLIP karşılaştırıldı:
+
+  | yöntem | boyut | etnik@5 | renk@5 | eş sırası |
+  |---|---|---|---|---|
+  | vgg16 (flatten) | 25.088 | 0,49 | 0,17 | 4,6 |
+  | clip ViT-B/32 | 512 | 0,56 | 0,19 | 4,2 |
+  | clip ViT-B/16 | 512 | 0,64 | 0,19 | 7,2 |
+
+  Görselden görsele: belirgin kazanan yok. CLIP kombin/stil türünü daha iyi yakalıyor ("black top, white trousers" → blazer, takım, sokak stili), VGG16 doku ve deseni daha iyi yakalıyor ("sparkling black dress" → payetli elbiseler; "black floral saree" → etnik kıyafetler). Renk tutarlılığı ikisinde de zayıf.
+  Metinden arama (CLIP): çok iyi — "a red sequined dress", "a houndstooth dress", "white trousers", "a black lace dress" sorgularında doğru görseller ilk 3'te. B/32 ve B/16 benzer; B/32 daha hızlı ve küçük.
+  **Öneri:** görselden görsele VGG16 kalsın, CLIP ViT-B/32 metinden arama için eklensin. Sıradaki adım: **metinden aramayı pakete / CLI'ye / arayüze ekleme**.
