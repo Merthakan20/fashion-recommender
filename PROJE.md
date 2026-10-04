@@ -54,20 +54,21 @@ fashion-recommender/
 - [x] `git init` ve ilk commit
 
 ### Aşama 1 — Paket
-- [ ] `config.py`: veri klasörü, önbellek yolu, model adı, görsel boyutu
-- [ ] `data.py`: `list_images()` — desteklenen uzantılar, büyük/küçük harf duyarsız, sıralı
-- [ ] `features.py`: `load_model()`, `extract_features(path)`, önbellekli `build_index()`
-- [ ] `recommend.py`: `recommend(image_path, top_n) -> [(yol, skor), ...]`
+- [x] `config.py`: veri klasörü, önbellek yolu, görsel boyutu, batch boyutu
+- [x] `data.py`: `list_images()` — desteklenen uzantılar, büyük/küçük harf duyarsız, sıralı
+- [x] `features.py`: `load_model()`, `extract_features(model, paths)` (batch'li), önbellekli `build_index()`
+- [x] `recommend.py`: `recommend(image_path, paths, features, top_n) -> [(yol, skor), ...]`
 
 ### Aşama 2 — Komut satırı (CLI)
-- [ ] `python -m fashion_rec index` → özellikleri çıkar ve önbellekle
-- [ ] `python -m fashion_rec recommend <görsel> -n 5` → önerileri skorlarıyla yazdır
+- [x] `python -m fashion_rec index [--force]` → özellikleri çıkar ve önbellekle
+- [x] `python -m fashion_rec recommend <görsel> -n 5` → önerileri skorlarıyla yazdır
 
 ### Aşama 3 — Testler
-- [ ] Sahte (hafif) bir modelle pytest altyapısı (TensorFlow gerektirmeden çalışsın)
-- [ ] Önbellek: ikinci çalıştırmada model çağrılmıyor; görsel listesi değişince yeniden hesaplanıyor
-- [ ] Öneri: girdi görseli sonuçlarda yok, sonuçlar azalan skorla sıralı, tam `top_n` sonuç dönüyor
-- [ ] Veri setinde olmayan bir görselle çalışıyor
+- [x] Sahte (hafif) bir modelle pytest altyapısı (TensorFlow gerektirmeden çalışsın)
+- [x] Önbellek: ikinci çalıştırmada model çağrılmıyor; görsel listesi değişince yeniden hesaplanıyor
+- [x] Öneri: girdi görseli sonuçlarda yok, sonuçlar azalan skorla sıralı, tam `top_n` sonuç dönüyor
+- [x] Veri setinde olmayan bir görselle çalışıyor
+- [x] (Ek) `data.py` ve CLI testleri
 
 ### Aşama 4 — Web arayüzü (Streamlit)
 - [ ] Görsel yükleme **veya** veri setinden görsel seçme
@@ -97,3 +98,6 @@ fashion-recommender/
 
 - **2026-10-04** — Proje sıfırdan `fashion-recommender/` klasöründe başlatıldı. Klasör yapısı, veri, `requirements.txt` ve `.gitignore` hazır. Sıradaki adım: conda ortamı + bağımlılık kurulumu.
 - **2026-10-04** — Aşama 0 tamamlandı: `fashion-rec` conda ortamı (Python 3.11) kuruldu, bağımlılıklar yüklendi ve sabitlendi, git başlatıldı. Ortamı açmak için: `conda activate fashion-rec`. Sıradaki adım: **Aşama 1 — Paket**.
+- **2026-10-04** — Aşama 1 tamamlandı: `fashion_rec` paketi yazıldı ve gerçek VGG16 ile denendi. 96 görselin özellik çıkarımı ~7 sn, önbellekten yükleme anında. Veri setindeki görseller için model hiç yüklenmiyor (vektör önbellekten alınıyor). Sıradaki adım: **Aşama 2 — CLI**.
+- **2026-10-04** — Aşama 2 tamamlandı: `fashion_rec/__main__.py` ile `index` ve `recommend` komutları eklendi. Hatalı girdiler (olmayan dosya, `-n 0`) anlaşılır mesajla reddediliyor. Komutlar proje klasöründen, `fashion-rec` ortamı açıkken çalıştırılır. Sıradaki adım: **Aşama 3 — Testler**.
+- **2026-10-04** — Aşama 3 tamamlandı: `tests/` altında 28 test (data, features, recommend, CLI). TensorFlow yüklenmeden ~0,1 sn'de çalışıyor; düz renkli test görselleri ve sahte model kullanılıyor. Koda bilerek eklenen iki hata (ters sıralama, girdi görselinin çıkarılmaması) testlerce yakalandı. Çalıştırma: `python -m pytest`. Sıradaki adım: **Aşama 4 — Web arayüzü**.

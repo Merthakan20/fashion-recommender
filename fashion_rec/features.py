@@ -1,0 +1,60 @@
+"""Görsellerden CNN özellik vektörü çıkarma ve önbellekleme."""
+
+from pathlib import Path
+
+import numpy as np
+
+from .config import BATCH_SIZE, CACHE_PATH, DATA_DIR, IMAGE_SIZE
+from .data import list_images
+
+
+def load_model():
+    """ImageNet ağırlıklı, sınıflandırma katmanı olmayan VGG16'yı yükler.
+
+    TensorFlow yavaş açıldığı için import burada yapılır; önbellek
+    geçerliyse model hiç yüklenmez.
+    """
+    from tensorflow.keras.applications import VGG16
+
+    return VGG16(weights="imagenet", include_top=False)
+
+
+def preprocess_image(path: Path) -> np.ndarray:
+    """Görseli VGG16 girişine uygun (224, 224, 3) diziye çevirir."""
+    from tensorflow.keras.applications.vgg16 import preprocess_input
+    from tensorflow.keras.utils import img_to_array, load_img
+
+    img = load_img(path, target_size=IMAGE_SIZE, color_mode="rgb")
+    return preprocess_input(img_to_array(img))
+
+
+def extract_features(model, paths: list[Path]) -> np.ndarray:
+    """Her görsel için L2 normalize edilmiş, düzleştirilmiş özellik vektörü döndürür."""
+    batches = []
+    for start in range(0, len(paths), BATCH_SIZE):
+        batch = np.stack([preprocess_image(p) for p in paths[start:start + BATCH_SIZE]])
+        out = model.predict(batch, verbose=0)
+        batches.append(out.reshape(len(batch), -1))
+    features = np.concatenate(batches)
+    return features / np.linalg.norm(features, axis=1, keepdims=True)
+
+
+def build_index(data_dir: Path = DATA_DIR, cache_path: Path = CACHE_PATH,
+                model=None, force: bool = False) -> tuple[list[Path], np.ndarray]:
+    """Veri setinin (görsel yolları, özellik matrisi) ikilisini döndürür.
+
+    Önbellekteki dosya adları güncel görsel listesiyle aynıysa önbellek
+    kullanılır; değilse (veya force=True ise) özellikler yeniden çıkarılır.
+    """
+    paths = list_images(data_dir)
+    names = [p.name for p in paths]
+
+    if not force and Path(cache_path).exists():
+        cache = np.load(cache_path)
+        if list(cache["names"]) == names:
+            return paths, cache["features"]
+
+    model = model or load_model()
+    features = extract_features(model, paths)
+    np.savez(cache_path, features=features, names=np.array(names))
+    return paths, features

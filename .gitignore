@@ -4,3 +4,4 @@ __pycache__/
 .DS_Store
 features.npz
 .venv/
+.pytest_cache/
