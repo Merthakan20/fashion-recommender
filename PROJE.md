@@ -36,6 +36,7 @@ fashion-recommender/
 ├── notebooks/                # deneme / görselleştirme notebook'ları
 ├── data/
 │   └── women fashion/        # görseller (96 adet)
+├── docs/                     # README görselleri
 ├── tests/
 ├── requirements.txt
 ├── .gitignore
@@ -84,7 +85,7 @@ fashion-recommender/
 - [ ] Birkaç örnek görsel için önerileri yan yana kaydedip gözle değerlendirme
 
 ### Aşama 6 — Dokümantasyon
-- [ ] `README.md`: proje tanımı, kurulum, CLI ve arayüz kullanımı, ekran görüntüsü
+- [x] `README.md`: proje tanımı, kurulum, CLI ve arayüz kullanımı, ekran görüntüsü (`docs/screenshot.png`)
 
 ## 5. Açık sorular / kararlar
 
@@ -103,3 +104,4 @@ fashion-recommender/
 - **2026-10-04** — Aşama 2 tamamlandı: `fashion_rec/__main__.py` ile `index` ve `recommend` komutları eklendi. Hatalı girdiler (olmayan dosya, `-n 0`) anlaşılır mesajla reddediliyor. Komutlar proje klasöründen, `fashion-rec` ortamı açıkken çalıştırılır. Sıradaki adım: **Aşama 3 — Testler**.
 - **2026-10-04** — Aşama 3 tamamlandı: `tests/` altında 28 test (data, features, recommend, CLI). TensorFlow yüklenmeden ~0,1 sn'de çalışıyor; düz renkli test görselleri ve sahte model kullanılıyor. Koda bilerek eklenen iki hata (ters sıralama, girdi görselinin çıkarılmaması) testlerce yakalandı. Çalıştırma: `python -m pytest`. Sıradaki adım: **Aşama 4 — Web arayüzü**.
 - **2026-10-04** — Aşama 1–3 commit edildi (`e24575f`). Aşama 4 tamamlandı: `app.py` Streamlit arayüzü. AppTest ile veri setinden seçim, kaydırıcı ve mod değişimi; gerçek modelle yükleme yolu denendi (küçültülüp PNG yapılan sari, aslını 0,971 skorla buldu; geçici dosya siliniyor). Sıradaki adım: **Aşama 5 (isteğe bağlı) veya Aşama 6 — README**.
+- **2026-10-04** — Aşama 6 tamamlandı: `README.md` yazıldı (nasıl çalışır, kurulum, CLI / arayüz / Python kullanımı, testler, proje yapısı). CLI örnek çıktısı gerçek çalıştırmadan alındı; arayüz ekran görüntüsü `docs/screenshot.png`. 28 test geçiyor. Sıradaki adım: **Aşama 5 (isteğe bağlı) — model iyileştirmeleri**.
