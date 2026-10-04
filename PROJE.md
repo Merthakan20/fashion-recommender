@@ -19,7 +19,7 @@ Bir kıyafet görseli verildiğinde, veri setindeki en çok benzeyen kıyafetler
 3. Vektörler `features.npz` dosyasına önbelleklenir; görsel listesi değişince yeniden hesaplanır.
 4. Girdi görselinin vektörüyle tüm vektörlerin nokta çarpımı alınır (= cosine benzerliği), en yüksek N sonuç döner. Girdi görselinin kendisi sonuçlardan çıkarılır.
 
-**Veri seti:** 96 kadın kıyafeti görseli. Dosya adları kıyafetin açıklaması (ör. `black floral saree.jpg`).
+**Veri seti:** 93 kadın kıyafeti görseli (3 kopya ayıklandı). Dosya adları kıyafetin açıklaması (ör. `black floral saree.jpg`).
 
 ## 3. Klasör yapısı
 
@@ -36,7 +36,7 @@ fashion-recommender/
 ├── app.py                    # Streamlit arayüzü
 ├── notebooks/                # deneme / görselleştirme notebook'ları
 ├── data/
-│   └── women fashion/        # görseller (96 adet)
+│   └── women fashion/        # görseller (93 adet)
 ├── docs/                     # README görselleri
 ├── tests/
 ├── requirements.txt
@@ -95,7 +95,7 @@ fashion-recommender/
 | Web arayüzü | Streamlit / Gradio | Streamlit | Streamlit |
 | Ortam | conda / venv | conda (Anaconda zaten kurulu) | conda (`fashion-rec`) |
 | Model | VGG16 / ResNet50 / CLIP | Önce VGG16, Aşama 5'te karşılaştır | Görselden görsele: VGG16 flatten. Metinden arama: CLIP ViT-B/32 (torch + open_clip zorunlu bağımlılık) |
-| Kopya görseller | sil / bırak | — | — (3 neredeyse aynı çift bulundu, bkz. notlar) |
+| Kopya görseller | sil / bırak | — | Düşük çözünürlüklü kopya silindi, yüksek çözünürlüklü dosyaya açıklayıcı ad verildi |
 | Sürüm kontrolü | git var / yok | git | git |
 
 ## 6. Çalışma notları
@@ -129,3 +129,4 @@ fashion-recommender/
   Metinden arama (CLIP): çok iyi — "a red sequined dress", "a houndstooth dress", "white trousers", "a black lace dress" sorgularında doğru görseller ilk 3'te. B/32 ve B/16 benzer; B/32 daha hızlı ve küçük.
   **Öneri:** görselden görsele VGG16 kalsın, CLIP ViT-B/32 metinden arama için eklensin. Sıradaki adım: **metinden aramayı pakete / CLI'ye / arayüze ekleme**.
 - **2026-10-04** — CLIP karşılaştırması commit edildi (`a43fb18`). Metinden arama eklendi: `fashion_rec/text_search.py` (`ClipModel`, `build_text_index`, `search`), ayrı önbellek `clip_features.npz`. Önbellek mantığı `features.cached_features()` olarak ortaklaştırıldı. CLI: `search "<metin>" -n 5` ve `index --text`. Arayüz: "Metinle ara" modu (CLIP modeli ve indeksi `st.cache_resource` ile, yalnızca bu mod seçilince yükleniyor). `torch`, `torchvision`, `open_clip_torch` `requirements.txt`'e zorunlu olarak eklendi. TensorFlow ve torch'un aynı süreçte birlikte çalıştığı doğrulandı. Testler 38'e çıktı (sahte CLIP modeli: renk kelimesi → RGB); bilerek ters çevrilen sıralama 4 testte yakalandı. Arayüz tarayıcıda denendi ("black lace dress" → siyah dantel/payetli elbiseler). Aşama 5'in tüm maddeleri tamamlandı.
+- **2026-10-04** — Metinden arama commit edildi (`b0e0829`). Kopya görseller ayıklandı (96 → 93): her çiftte anlamsız adlı dosya aslında yüksek çözünürlüklüydü (ör. 488×650'ye karşı 194×259), bu yüzden düşük çözünürlüklü kopya silindi ve yüksek çözünürlüklü dosyaya açıklayıcı ad verildi (`blue dress with a floral pattern.jpeg`, `fitted, off-the-shoulder white dress with horizontal ribbed texture.webp`, `long, flowing dress with a full skirt.webp`). İndeksler yeniden oluşturuldu; VGG16'da en yüksek benzerlik artık 0,70 (aynı kıyafetin farklı pozu). `tight-fitting, off-the-shoulder white dress` ve `… 2` aynı elbisenin iki farklı fotoğrafı olduğu için bırakıldı. Sıradaki adım: **çok dilli CLIP ile Türkçe arama denemesi**.

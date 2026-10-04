@@ -40,7 +40,6 @@ PAIRS = [
     ("tight-fitting, off-the-shoulder white dress.webp", "tight-fitting, off-the-shoulder white dress 2.jpg"),
     ("dress with a classic black and white houndstooth pattern.jpg",
      "fitted dress with a classic black and white houndstooth pattern.webp"),
-    ("long, flowing dress with a full skirt.jpg", "Latest-Party-Wear-One-Piece-Gown-For-Women.webp"),
 ]
 SHOWCASE = ["black floral saree.jpg", "red velvet sheath midi dress.jpg",
             "sparkling black dress.jpg", "black top, white trousers.jpg"]

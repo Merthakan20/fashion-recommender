@@ -41,7 +41,7 @@ Tüm komutlar proje klasöründen çalıştırılır.
 
 ### Komut satırı
 
-Özellikleri çıkarıp önbelleğe almak için (96 görsel için birkaç saniye sürer):
+Özellikleri çıkarıp önbelleğe almak için (93 görsel için birkaç saniye sürer):
 
 ```bash
 python -m fashion_rec index           # önbellek varsa onu kullanır
@@ -128,7 +128,7 @@ fashion-recommender/
 │   ├── recommend.py      # benzerlik hesabı + öneri
 │   └── text_search.py    # CLIP ile metinden arama
 ├── app.py                # Streamlit arayüzü
-├── data/women fashion/   # 96 kadın kıyafeti görseli
+├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları
 ├── docs/                 # README görselleri
 ├── tests/                # pytest testleri
@@ -140,4 +140,4 @@ Ayarlar (veri klasörü, önbellek yolları, görsel boyutu, batch boyutu, CLIP 
 
 ## Veri seti
 
-96 kadın kıyafeti görseli. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`) ve arayüzde etiket olarak kullanılır.
+93 kadın kıyafeti görseli. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`) ve arayüzde etiket olarak kullanılır.
