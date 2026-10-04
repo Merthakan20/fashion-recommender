@@ -78,9 +78,9 @@ with st.sidebar:
     st.caption(f"Veri setinde {len(paths)} görsel var.")
 
 if source == "Metinle ara":
-    query = st.text_input("Aradığınız kıyafeti tarif edin (İngilizce)", placeholder="red sequined dress").strip()
+    query = st.text_input("Aradığınız kıyafeti tarif edin (Türkçe veya İngilizce)", placeholder="kırmızı payetli elbise").strip()
     if not query:
-        st.info("Başlamak için bir tarif yazın, ör. *black lace dress* veya *white trousers*.")
+        st.info("Başlamak için bir tarif yazın, ör. *siyah dantel elbise* veya *white trousers*.")
     else:
         text_paths, text_features = get_text_index()
         st.subheader("Sonuçlar")

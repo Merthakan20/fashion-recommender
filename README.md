@@ -1,6 +1,6 @@
 # 👗 Fashion Recommender
 
-Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti metinle tarif ederek de arama yapılabilir (ör. *red sequined dress*).
+Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti Türkçe veya İngilizce tarif ederek de arama yapılabilir (ör. *kırmızı payetli elbise*).
 
 Üç şekilde kullanılabilir:
 
@@ -8,7 +8,9 @@ Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli ver
 - **Komut satırı (CLI)** — `python -m fashion_rec ...`
 - **Web arayüzü** — Streamlit
 
-![Streamlit arayüzü](docs/screenshot.png)
+![Görselden öneri](docs/screenshot.png)
+
+![Metinden arama](docs/text_search.png)
 
 ## Nasıl çalışır
 
@@ -19,9 +21,9 @@ Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli ver
 
 Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yüklenmez. Model yalnızca veri setinde olmayan bir görsel geldiğinde açılır.
 
-**Metinden arama** için [CLIP](https://github.com/mlfoundations/open_clip) (ViT-B/32, OpenAI ağırlıkları) kullanılır: görseller ve arama metni aynı vektör uzayına kodlanır, en yüksek cosine benzerliğine sahip görseller döner. CLIP vektörleri ayrı bir önbellekte (`clip_features.npz`) tutulur. Metin İngilizce yazılmalıdır.
+**Metinden arama** için çok dilli bir [CLIP](https://github.com/mlfoundations/open_clip) modeli (`xlm-roberta-base-ViT-B-32`, LAION-5B) kullanılır: görseller ve arama metni aynı vektör uzayına kodlanır, en yüksek cosine benzerliğine sahip görseller döner. Metin Türkçe veya İngilizce (ve diğer pek çok dilde) yazılabilir. CLIP vektörleri ayrı bir önbellekte (`clip_features.npz`) tutulur; önbellek modeli de kaydeder, model değişince otomatik yeniden hesaplanır.
 
-Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı; ayrıntılar `PROJE.md` ve `notebooks/` altında.
+Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı. Metinden aramada çok dilli model, 20 Türkçe sorgunun 19'unda doğru kıyafeti ilk 3'e getirdi (OpenAI CLIP: 3/20). Ayrıntılar `PROJE.md` ve `notebooks/` altında.
 
 ## Kurulum
 
@@ -33,7 +35,7 @@ conda activate fashion-rec
 pip install -r requirements.txt
 ```
 
-İlk çalıştırmada VGG16 ağırlıkları (~60 MB) Keras tarafından, CLIP ağırlıkları (~600 MB) Hugging Face'ten otomatik indirilir. TensorFlow ve PyTorch birlikte kurulduğu için ortam ~3 GB yer kaplar.
+İlk çalıştırmada VGG16 ağırlıkları (~60 MB) Keras tarafından, CLIP ağırlıkları (~1,5 GB) Hugging Face'ten otomatik indirilir. TensorFlow ve PyTorch birlikte kurulduğu için ortam ~3 GB yer kaplar.
 
 ## Kullanım
 
@@ -70,18 +72,18 @@ Girdi görseli veri setinde olmak zorunda değil, herhangi bir görsel yolu veri
 Metinle aramak için:
 
 ```bash
-python -m fashion_rec search "red sequined dress" -n 3
+python -m fashion_rec search "kırmızı payetli elbise" -n 3
 ```
 
 ```
-Sorgu: red sequined dress
+Sorgu: kırmızı payetli elbise
 
- 1. 0.308  bright red, sequined dress with thin shoulder straps.jpg
- 2. 0.298  sleeveless dress adorned with pink sequins.jpg
- 3. 0.295  sparkling, fitted dress with long sleeves.jpg
+ 1. 0.255  bright red, sequined dress with thin shoulder straps.jpg
+ 2. 0.218  sleeveless dress adorned with pink sequins.jpg
+ 3. 0.200  pink, knee-length dress that sparkles.jpg
 ```
 
-CLIP skorları doğası gereği düşük ve birbirine yakındır (≈0,2–0,35); önemli olan sıralamadır.
+CLIP skorları doğası gereği düşük ve birbirine yakındır (≈0,15–0,3); önemli olan sıralamadır. Her `search` çağrısı modeli yeniden yüklediği için ~10 sn sürer; arayüzde model bir kez yüklenir ve aramalar anında döner.
 
 ### Web arayüzü
 
@@ -126,7 +128,7 @@ fashion-recommender/
 │   ├── data.py           # görsel listeleme
 │   ├── features.py       # model yükleme, özellik çıkarma, önbellek
 │   ├── recommend.py      # benzerlik hesabı + öneri
-│   └── text_search.py    # CLIP ile metinden arama
+│   └── text_search.py    # çok dilli CLIP ile metinden arama
 ├── app.py                # Streamlit arayüzü
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları

@@ -51,18 +51,22 @@ def build_index(data_dir: Path = DATA_DIR, cache_path: Path = CACHE_PATH,
                                   lambda: extract_features(model or load_model(), paths), force)
 
 
-def cached_features(paths: list[Path], cache_path: Path, compute, force: bool = False) -> np.ndarray:
-    """Önbellekteki dosya adları `paths` ile aynıysa önbelleği, değilse `compute()` sonucunu döndürür.
+def cached_features(paths: list[Path], cache_path: Path, compute, force: bool = False,
+                    key: str = "") -> np.ndarray:
+    """Önbellek `paths` ve `key` ile uyuşuyorsa önbelleği, değilse `compute()` sonucunu döndürür.
 
-    Yeniden hesaplanan özellikler önbelleğe yazılır.
+    `key` vektörleri üreten modeli tanımlar; model değişince aynı boyutlu
+    eski vektörlerin sessizce kullanılmasını önler. Yeniden hesaplanan
+    özellikler önbelleğe yazılır.
     """
     names = [p.name for p in paths]
 
     if not force and Path(cache_path).exists():
         cache = np.load(cache_path)
-        if list(cache["names"]) == names:
+        cached_key = str(cache["key"]) if "key" in cache.files else ""
+        if list(cache["names"]) == names and cached_key == key:
             return cache["features"]
 
     features = compute()
-    np.savez(cache_path, features=features, names=np.array(names))
+    np.savez(cache_path, features=features, names=np.array(names), key=np.array(key))
     return features

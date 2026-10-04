@@ -54,7 +54,8 @@ def build_text_index(data_dir: Path = DATA_DIR, cache_path: Path = CLIP_CACHE_PA
     """
     paths = list_images(data_dir)
     return paths, cached_features(paths, cache_path,
-                                  lambda: normalize((model or load_clip_model()).encode_images(paths)), force)
+                                  lambda: normalize((model or load_clip_model()).encode_images(paths)),
+                                  force, key=f"{CLIP_MODEL}/{CLIP_PRETRAINED}")
 
 
 def search(query: str, paths: list[Path], features: np.ndarray,

@@ -13,5 +13,6 @@ BATCH_SIZE = 16
 
 # Metinden arama (CLIP)
 CLIP_CACHE_PATH = PROJECT_ROOT / "clip_features.npz"
-CLIP_MODEL = "ViT-B-32-quickgelu"
-CLIP_PRETRAINED = "openai"
+# Çok dilli (Türkçe dahil) CLIP; karşılaştırma: notebooks/compare_multilingual.py
+CLIP_MODEL = "xlm-roberta-base-ViT-B-32"
+CLIP_PRETRAINED = "laion5b_s13b_b90k"

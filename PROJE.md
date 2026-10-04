@@ -94,7 +94,7 @@ fashion-recommender/
 |---|---|---|---|
 | Web arayüzü | Streamlit / Gradio | Streamlit | Streamlit |
 | Ortam | conda / venv | conda (Anaconda zaten kurulu) | conda (`fashion-rec`) |
-| Model | VGG16 / ResNet50 / CLIP | Önce VGG16, Aşama 5'te karşılaştır | Görselden görsele: VGG16 flatten. Metinden arama: CLIP ViT-B/32 (torch + open_clip zorunlu bağımlılık) |
+| Model | VGG16 / ResNet50 / CLIP | Önce VGG16, Aşama 5'te karşılaştır | Görselden görsele: VGG16 flatten. Metinden arama: çok dilli CLIP `xlm-roberta-base-ViT-B-32` (LAION), Türkçe + İngilizce |
 | Kopya görseller | sil / bırak | — | Düşük çözünürlüklü kopya silindi, yüksek çözünürlüklü dosyaya açıklayıcı ad verildi |
 | Sürüm kontrolü | git var / yok | git | git |
 
@@ -130,3 +130,15 @@ fashion-recommender/
   **Öneri:** görselden görsele VGG16 kalsın, CLIP ViT-B/32 metinden arama için eklensin. Sıradaki adım: **metinden aramayı pakete / CLI'ye / arayüze ekleme**.
 - **2026-10-04** — CLIP karşılaştırması commit edildi (`a43fb18`). Metinden arama eklendi: `fashion_rec/text_search.py` (`ClipModel`, `build_text_index`, `search`), ayrı önbellek `clip_features.npz`. Önbellek mantığı `features.cached_features()` olarak ortaklaştırıldı. CLI: `search "<metin>" -n 5` ve `index --text`. Arayüz: "Metinle ara" modu (CLIP modeli ve indeksi `st.cache_resource` ile, yalnızca bu mod seçilince yükleniyor). `torch`, `torchvision`, `open_clip_torch` `requirements.txt`'e zorunlu olarak eklendi. TensorFlow ve torch'un aynı süreçte birlikte çalıştığı doğrulandı. Testler 38'e çıktı (sahte CLIP modeli: renk kelimesi → RGB); bilerek ters çevrilen sıralama 4 testte yakalandı. Arayüz tarayıcıda denendi ("black lace dress" → siyah dantel/payetli elbiseler). Aşama 5'in tüm maddeleri tamamlandı.
 - **2026-10-04** — Metinden arama commit edildi (`b0e0829`). Kopya görseller ayıklandı (96 → 93): her çiftte anlamsız adlı dosya aslında yüksek çözünürlüklüydü (ör. 488×650'ye karşı 194×259), bu yüzden düşük çözünürlüklü kopya silindi ve yüksek çözünürlüklü dosyaya açıklayıcı ad verildi (`blue dress with a floral pattern.jpeg`, `fitted, off-the-shoulder white dress with horizontal ribbed texture.webp`, `long, flowing dress with a full skirt.webp`). İndeksler yeniden oluşturuldu; VGG16'da en yüksek benzerlik artık 0,70 (aynı kıyafetin farklı pozu). `tight-fitting, off-the-shoulder white dress` ve `… 2` aynı elbisenin iki farklı fotoğrafı olduğu için bırakıldı. Sıradaki adım: **çok dilli CLIP ile Türkçe arama denemesi**.
+- **2026-10-04** — Kopyalar commit edildi (`1460c31`). Türkçe arama için çok dilli modeller `notebooks/compare_multilingual.py` ile karşılaştırıldı (20 Türkçe/İngilizce sorgu çifti, doğru cevap dosya adındaki kelimelerle tanımlı):
+
+  | model | dil | hit@1 | hit@3 | MRR |
+  |---|---|---|---|---|
+  | OpenAI CLIP ViT-B/32 (eski) | tr | 0,05 | 0,15 | 0,16 |
+  | OpenAI CLIP ViT-B/32 (eski) | en | 0,90 | 1,00 | 0,93 |
+  | `clip-ViT-B-32-multilingual-v1` (sentence-transformers) | tr | 0,30 | 0,45 | 0,41 |
+  | `clip-ViT-B-32-multilingual-v1` (sentence-transformers) | en | 0,40 | 0,75 | 0,57 |
+  | **`xlm-roberta-base-ViT-B-32` (LAION)** | tr | **0,70** | **0,95** | **0,82** |
+  | **`xlm-roberta-base-ViT-B-32` (LAION)** | en | **0,95** | **1,00** | **0,97** |
+
+  **Karar: LAION xlm-roberta modeline geçildi** — Türkçede büyük sıçrama, İngilizcede kayıp yok. Bedeli: ağırlıklar 605 MB → 1,46 GB, `transformers` yeni bağımlılık. Önbelleğe model kimliği (`key`) eklendi: iki model de 512 boyutlu olduğundan, eskiden model değişse bile eski vektörler sessizce kullanılırdı (2 yeni test, toplam 40). Arayüz ve CLI metinleri "Türkçe veya İngilizce" olarak güncellendi, README'ye metinden arama ekran görüntüsü eklendi. Not: sorgu seti küçük ve dosya adlarına dayalı; sonuçlar yön gösterici.

@@ -73,8 +73,8 @@ def main(argv=None) -> None:
     p_rec.add_argument("-n", type=positive_int, default=5, help="öneri sayısı (varsayılan: 5)")
     p_rec.set_defaults(func=cmd_recommend)
 
-    p_search = sub.add_parser("search", help="metne uyan kıyafetleri bul (CLIP, İngilizce metin)")
-    p_search.add_argument("query", help='arama metni, ör. "red sequined dress"')
+    p_search = sub.add_parser("search", help="metne uyan kıyafetleri bul (CLIP, Türkçe veya İngilizce)")
+    p_search.add_argument("query", help='arama metni, ör. "kırmızı payetli elbise"')
     p_search.add_argument("-n", type=positive_int, default=5, help="sonuç sayısı (varsayılan: 5)")
     p_search.set_defaults(func=cmd_search)
 

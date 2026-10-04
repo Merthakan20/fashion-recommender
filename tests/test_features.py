@@ -1,7 +1,8 @@
 import numpy as np
+import pytest
 
 import fashion_rec.features as features_module
-from fashion_rec.features import build_index, extract_features
+from fashion_rec.features import build_index, cached_features, extract_features
 
 from .conftest import COLORS, make_image
 
@@ -55,3 +56,25 @@ def test_force_recomputes(data_dir, cache_path, model):
     calls = model.calls
     build_index(data_dir, cache_path, model=model, force=True)
     assert model.calls > calls
+
+
+def test_model_key_change_invalidates_cache(data_dir, cache_path, model):
+    paths = sorted(data_dir.iterdir())
+    calls = []
+
+    def compute():
+        calls.append(1)
+        return np.ones((len(paths), 3))
+
+    cached_features(paths, cache_path, compute, key="model-a")
+    cached_features(paths, cache_path, compute, key="model-a")
+    assert len(calls) == 1
+    cached_features(paths, cache_path, compute, key="model-b")
+    assert len(calls) == 2
+
+
+def test_cache_without_key_is_valid_for_empty_key(data_dir, cache_path):
+    paths = sorted(data_dir.iterdir())
+    np.savez(cache_path, features=np.ones((len(paths), 3)), names=np.array([p.name for p in paths]))
+    result = cached_features(paths, cache_path, lambda: pytest.fail("önbellek kullanılmalıydı"))
+    assert result.shape == (len(paths), 3)
