@@ -71,10 +71,11 @@ fashion-recommender/
 - [x] (Ek) `data.py` ve CLI testleri
 
 ### Aşama 4 — Web arayüzü (Streamlit)
-- [ ] Görsel yükleme **veya** veri setinden görsel seçme
-- [ ] Öneri sayısı için kaydırıcı (top-N)
-- [ ] Önerileri benzerlik skorlarıyla ızgara halinde gösterme
-- [ ] Model ve özellikleri `st.cache_resource` ile bir kez yükleme
+- [x] Görsel yükleme **veya** veri setinden görsel seçme
+- [x] Öneri sayısı için kaydırıcı (top-N, 1–12)
+- [x] Önerileri benzerlik skorlarıyla ızgara halinde gösterme
+- [x] Model ve özellikleri `st.cache_resource` ile bir kez yükleme (model yalnızca görsel yüklenince açılıyor)
+- [x] Çalıştırma: `streamlit run app.py`
 
 ### Aşama 5 — Model iyileştirmeleri (isteğe bağlı)
 - [ ] `pooling='avg'` ile vektörü 25.088 → 512 boyuta indir; kaliteyi karşılaştır
@@ -101,3 +102,4 @@ fashion-recommender/
 - **2026-10-04** — Aşama 1 tamamlandı: `fashion_rec` paketi yazıldı ve gerçek VGG16 ile denendi. 96 görselin özellik çıkarımı ~7 sn, önbellekten yükleme anında. Veri setindeki görseller için model hiç yüklenmiyor (vektör önbellekten alınıyor). Sıradaki adım: **Aşama 2 — CLI**.
 - **2026-10-04** — Aşama 2 tamamlandı: `fashion_rec/__main__.py` ile `index` ve `recommend` komutları eklendi. Hatalı girdiler (olmayan dosya, `-n 0`) anlaşılır mesajla reddediliyor. Komutlar proje klasöründen, `fashion-rec` ortamı açıkken çalıştırılır. Sıradaki adım: **Aşama 3 — Testler**.
 - **2026-10-04** — Aşama 3 tamamlandı: `tests/` altında 28 test (data, features, recommend, CLI). TensorFlow yüklenmeden ~0,1 sn'de çalışıyor; düz renkli test görselleri ve sahte model kullanılıyor. Koda bilerek eklenen iki hata (ters sıralama, girdi görselinin çıkarılmaması) testlerce yakalandı. Çalıştırma: `python -m pytest`. Sıradaki adım: **Aşama 4 — Web arayüzü**.
+- **2026-10-04** — Aşama 1–3 commit edildi (`e24575f`). Aşama 4 tamamlandı: `app.py` Streamlit arayüzü. AppTest ile veri setinden seçim, kaydırıcı ve mod değişimi; gerçek modelle yükleme yolu denendi (küçültülüp PNG yapılan sari, aslını 0,971 skorla buldu; geçici dosya siliniyor). Sıradaki adım: **Aşama 5 (isteğe bağlı) veya Aşama 6 — README**.
