@@ -47,14 +47,22 @@ def build_index(data_dir: Path = DATA_DIR, cache_path: Path = CACHE_PATH,
     kullanılır; değilse (veya force=True ise) özellikler yeniden çıkarılır.
     """
     paths = list_images(data_dir)
+    return paths, cached_features(paths, cache_path,
+                                  lambda: extract_features(model or load_model(), paths), force)
+
+
+def cached_features(paths: list[Path], cache_path: Path, compute, force: bool = False) -> np.ndarray:
+    """Önbellekteki dosya adları `paths` ile aynıysa önbelleği, değilse `compute()` sonucunu döndürür.
+
+    Yeniden hesaplanan özellikler önbelleğe yazılır.
+    """
     names = [p.name for p in paths]
 
     if not force and Path(cache_path).exists():
         cache = np.load(cache_path)
         if list(cache["names"]) == names:
-            return paths, cache["features"]
+            return cache["features"]
 
-    model = model or load_model()
-    features = extract_features(model, paths)
+    features = compute()
     np.savez(cache_path, features=features, names=np.array(names))
-    return paths, features
+    return features

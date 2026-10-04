@@ -10,3 +10,8 @@ CACHE_PATH = PROJECT_ROOT / "features.npz"
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 IMAGE_SIZE = (224, 224)  # VGG16 giriş boyutu
 BATCH_SIZE = 16
+
+# Metinden arama (CLIP)
+CLIP_CACHE_PATH = PROJECT_ROOT / "clip_features.npz"
+CLIP_MODEL = "ViT-B-32-quickgelu"
+CLIP_PRETRAINED = "openai"

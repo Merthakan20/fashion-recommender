@@ -1,6 +1,6 @@
 # 👗 Fashion Recommender
 
-Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir.
+Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti metinle tarif ederek de arama yapılabilir (ör. *red sequined dress*).
 
 Üç şekilde kullanılabilir:
 
@@ -19,6 +19,10 @@ Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli ver
 
 Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yüklenmez. Model yalnızca veri setinde olmayan bir görsel geldiğinde açılır.
 
+**Metinden arama** için [CLIP](https://github.com/mlfoundations/open_clip) (ViT-B/32, OpenAI ağırlıkları) kullanılır: görseller ve arama metni aynı vektör uzayına kodlanır, en yüksek cosine benzerliğine sahip görseller döner. CLIP vektörleri ayrı bir önbellekte (`clip_features.npz`) tutulur. Metin İngilizce yazılmalıdır.
+
+Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı; ayrıntılar `PROJE.md` ve `notebooks/` altında.
+
 ## Kurulum
 
 Python 3.11 gerekir. Örnek (conda):
@@ -29,7 +33,7 @@ conda activate fashion-rec
 pip install -r requirements.txt
 ```
 
-İlk çalıştırmada VGG16 ağırlıkları (~60 MB) Keras tarafından otomatik indirilir.
+İlk çalıştırmada VGG16 ağırlıkları (~60 MB) Keras tarafından, CLIP ağırlıkları (~600 MB) Hugging Face'ten otomatik indirilir. TensorFlow ve PyTorch birlikte kurulduğu için ortam ~3 GB yer kaplar.
 
 ## Kullanım
 
@@ -42,6 +46,7 @@ Tüm komutlar proje klasöründen çalıştırılır.
 ```bash
 python -m fashion_rec index           # önbellek varsa onu kullanır
 python -m fashion_rec index --force   # önbelleği yok sayıp yeniden hesaplar
+python -m fashion_rec index --text    # metin araması (CLIP) indeksini de oluşturur
 ```
 
 Bir görsele benzeyen kıyafetleri önermek için:
@@ -62,13 +67,29 @@ Girdi: black floral saree.jpg
 
 Girdi görseli veri setinde olmak zorunda değil, herhangi bir görsel yolu verilebilir. Önbellek yoksa `recommend` onu önce kendisi oluşturur.
 
+Metinle aramak için:
+
+```bash
+python -m fashion_rec search "red sequined dress" -n 3
+```
+
+```
+Sorgu: red sequined dress
+
+ 1. 0.308  bright red, sequined dress with thin shoulder straps.jpg
+ 2. 0.298  sleeveless dress adorned with pink sequins.jpg
+ 3. 0.295  sparkling, fitted dress with long sleeves.jpg
+```
+
+CLIP skorları doğası gereği düşük ve birbirine yakındır (≈0,2–0,35); önemli olan sıralamadır.
+
 ### Web arayüzü
 
 ```bash
 streamlit run app.py
 ```
 
-Kenar çubuğundan görsel kaynağını (veri setinden seç / görsel yükle) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir.
+Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir.
 
 ### Python'dan
 
@@ -79,6 +100,12 @@ from fashion_rec.recommend import recommend
 paths, features = build_index()
 for path, score in recommend("benim_elbisem.jpg", paths, features, top_n=5):
     print(f"{score:.3f}  {path.name}")
+
+from fashion_rec.text_search import build_text_index, load_clip_model, search
+
+clip = load_clip_model()
+paths, features = build_text_index(model=clip)
+results = search("black lace dress", paths, features, top_n=5, model=clip)
 ```
 
 ## Testler
@@ -87,7 +114,7 @@ for path, score in recommend("benim_elbisem.jpg", paths, features, top_n=5):
 python -m pytest
 ```
 
-Testler sahte, hafif bir model ve düz renkli test görselleri kullanır. TensorFlow yüklenmeden saniyenin altında çalışırlar.
+Testler sahte, hafif modeller (VGG16 ve CLIP yerine) ve düz renkli test görselleri kullanır. TensorFlow ve PyTorch yüklenmeden saniyenin altında çalışırlar.
 
 ## Proje yapısı
 
@@ -98,16 +125,18 @@ fashion-recommender/
 │   ├── config.py         # yollar, görsel boyutu, batch boyutu
 │   ├── data.py           # görsel listeleme
 │   ├── features.py       # model yükleme, özellik çıkarma, önbellek
-│   └── recommend.py      # benzerlik hesabı + öneri
+│   ├── recommend.py      # benzerlik hesabı + öneri
+│   └── text_search.py    # CLIP ile metinden arama
 ├── app.py                # Streamlit arayüzü
 ├── data/women fashion/   # 96 kadın kıyafeti görseli
+├── notebooks/            # model / havuzlama karşılaştırmaları
 ├── docs/                 # README görselleri
 ├── tests/                # pytest testleri
 ├── requirements.txt
 └── PROJE.md              # yol haritası ve çalışma notları
 ```
 
-Ayarlar (veri klasörü, önbellek yolu, görsel boyutu, batch boyutu) `fashion_rec/config.py` içindedir.
+Ayarlar (veri klasörü, önbellek yolları, görsel boyutu, batch boyutu, CLIP modeli) `fashion_rec/config.py` içindedir.
 
 ## Veri seti
 

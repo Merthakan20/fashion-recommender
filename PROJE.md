@@ -31,7 +31,8 @@ fashion-recommender/
 │   ├── config.py             # yollar, model ayarları
 │   ├── data.py               # görsel listeleme
 │   ├── features.py           # model yükleme, özellik çıkarma, önbellek
-│   └── recommend.py          # benzerlik hesabı + öneri
+│   ├── recommend.py          # benzerlik hesabı + öneri
+│   └── text_search.py        # CLIP ile metinden arama
 ├── app.py                    # Streamlit arayüzü
 ├── notebooks/                # deneme / görselleştirme notebook'ları
 ├── data/
@@ -81,7 +82,7 @@ fashion-recommender/
 ### Aşama 5 — Model iyileştirmeleri (isteğe bağlı)
 - [x] `pooling='avg'` ile vektörü 25.088 → 512 boyuta indir; kaliteyi karşılaştır → belirgin kazanç yok, **flatten kalıyor** (`notebooks/compare_pooling.py`)
 - [x] ResNet50 / EfficientNet / CLIP karşılaştırması → CLIP (ViT-B/32, ViT-B/16) denendi, görselden görsele net üstünlük yok; ResNet/EfficientNet atlandı (`notebooks/compare_models.py`)
-- [ ] CLIP ile metinden arama (ör. "kırmızı payetli elbise")
+- [x] CLIP ile metinden arama (ör. "red sequined dress") → `fashion_rec/text_search.py`, CLI `search`, arayüzde "Metinle ara"
 - [x] Birkaç örnek görsel için önerileri yan yana kaydedip gözle değerlendirme (`notebooks/pooling_comparison/`; yeni modeller eklendikçe genişletilecek)
 
 ### Aşama 6 — Dokümantasyon
@@ -93,7 +94,7 @@ fashion-recommender/
 |---|---|---|---|
 | Web arayüzü | Streamlit / Gradio | Streamlit | Streamlit |
 | Ortam | conda / venv | conda (Anaconda zaten kurulu) | conda (`fashion-rec`) |
-| Model | VGG16 / ResNet50 / CLIP | Önce VGG16, Aşama 5'te karşılaştır | Görselden görsele: VGG16 flatten. Metinden arama: CLIP ViT-B/32 (entegrasyon kararı bekliyor) |
+| Model | VGG16 / ResNet50 / CLIP | Önce VGG16, Aşama 5'te karşılaştır | Görselden görsele: VGG16 flatten. Metinden arama: CLIP ViT-B/32 (torch + open_clip zorunlu bağımlılık) |
 | Kopya görseller | sil / bırak | — | — (3 neredeyse aynı çift bulundu, bkz. notlar) |
 | Sürüm kontrolü | git var / yok | git | git |
 
@@ -127,3 +128,4 @@ fashion-recommender/
   Görselden görsele: belirgin kazanan yok. CLIP kombin/stil türünü daha iyi yakalıyor ("black top, white trousers" → blazer, takım, sokak stili), VGG16 doku ve deseni daha iyi yakalıyor ("sparkling black dress" → payetli elbiseler; "black floral saree" → etnik kıyafetler). Renk tutarlılığı ikisinde de zayıf.
   Metinden arama (CLIP): çok iyi — "a red sequined dress", "a houndstooth dress", "white trousers", "a black lace dress" sorgularında doğru görseller ilk 3'te. B/32 ve B/16 benzer; B/32 daha hızlı ve küçük.
   **Öneri:** görselden görsele VGG16 kalsın, CLIP ViT-B/32 metinden arama için eklensin. Sıradaki adım: **metinden aramayı pakete / CLI'ye / arayüze ekleme**.
+- **2026-10-04** — CLIP karşılaştırması commit edildi (`a43fb18`). Metinden arama eklendi: `fashion_rec/text_search.py` (`ClipModel`, `build_text_index`, `search`), ayrı önbellek `clip_features.npz`. Önbellek mantığı `features.cached_features()` olarak ortaklaştırıldı. CLI: `search "<metin>" -n 5` ve `index --text`. Arayüz: "Metinle ara" modu (CLIP modeli ve indeksi `st.cache_resource` ile, yalnızca bu mod seçilince yükleniyor). `torch`, `torchvision`, `open_clip_torch` `requirements.txt`'e zorunlu olarak eklendi. TensorFlow ve torch'un aynı süreçte birlikte çalıştığı doğrulandı. Testler 38'e çıktı (sahte CLIP modeli: renk kelimesi → RGB); bilerek ters çevrilen sıralama 4 testte yakalandı. Arayüz tarayıcıda denendi ("black lace dress" → siyah dantel/payetli elbiseler). Aşama 5'in tüm maddeleri tamamlandı.

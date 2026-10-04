@@ -2,6 +2,7 @@ import pytest
 
 import fashion_rec.__main__ as cli
 from fashion_rec.features import build_index
+from fashion_rec.text_search import build_text_index
 
 
 @pytest.fixture
@@ -9,6 +10,14 @@ def fake_index(data_dir, cache_path, model, monkeypatch):
     """CLI'nın gerçek veri seti yerine test görsellerini kullanmasını sağlar."""
     index = build_index(data_dir, cache_path, model=model)
     monkeypatch.setattr(cli, "build_index", lambda force=False: index)
+    return index
+
+
+@pytest.fixture
+def fake_text_index(data_dir, tmp_path, clip_model, monkeypatch):
+    index = build_text_index(data_dir, tmp_path / "clip.npz", model=clip_model)
+    monkeypatch.setattr(cli, "build_text_index", lambda model=None, force=False: index)
+    monkeypatch.setattr(cli, "load_clip_model", lambda: clip_model)
     return index
 
 
@@ -40,3 +49,24 @@ def test_invalid_n_is_rejected(data_dir, n):
 def test_command_is_required():
     with pytest.raises(SystemExit):
         cli.main([])
+
+
+def test_search_prints_ranked_results(fake_text_index, capsys):
+    cli.main(["search", "  blue dress  ", "-n", "2"])
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert lines[0] == "Sorgu: blue dress"
+    assert lines[-2].startswith(" 1.") and "blue.jpeg" in lines[-2]
+    assert lines[-1].startswith(" 2.")
+
+
+def test_empty_search_exits_with_error(fake_text_index):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["search", "   "])
+    assert "boş" in str(exc.value)
+
+
+def test_index_text_builds_both_indexes(fake_index, fake_text_index, capsys):
+    cli.main(["index", "--text"])
+    out = capsys.readouterr().out
+    assert "5 görsel indekslendi" in out
+    assert "metin araması için indekslendi" in out

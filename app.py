@@ -14,6 +14,7 @@ import streamlit as st  # noqa: E402
 from fashion_rec.config import IMAGE_EXTENSIONS  # noqa: E402
 from fashion_rec.features import build_index, load_model  # noqa: E402
 from fashion_rec.recommend import recommend  # noqa: E402
+from fashion_rec.text_search import build_text_index, load_clip_model, search  # noqa: E402
 
 GRID_COLUMNS = 4
 
@@ -26,6 +27,16 @@ def get_index():
 @st.cache_resource(show_spinner="Model yükleniyor...")
 def get_model():
     return load_model()
+
+
+@st.cache_resource(show_spinner="Metin arama modeli (CLIP) yükleniyor...")
+def get_clip_model():
+    return load_clip_model()
+
+
+@st.cache_resource(show_spinner="Metin arama indeksi hazırlanıyor...")
+def get_text_index():
+    return build_text_index(model=get_clip_model())
 
 
 def label(path: Path) -> str:
@@ -56,37 +67,46 @@ def show_grid(results):
 
 st.set_page_config(page_title="Fashion Recommender", page_icon="👗", layout="wide")
 st.title("👗 Fashion Recommender")
-st.caption("Bir kıyafet seçin veya yükleyin; görsel olarak en çok benzeyen kıyafetleri önerelim.")
+st.caption("Bir kıyafet seçin, yükleyin veya tarif edin; en çok benzeyen kıyafetleri önerelim.")
 
 paths, features = get_index()
 
 with st.sidebar:
     st.header("Ayarlar")
-    source = st.radio("Görsel kaynağı", ["Veri setinden seç", "Görsel yükle"])
+    source = st.radio("Arama şekli", ["Veri setinden seç", "Görsel yükle", "Metinle ara"])
     top_n = st.slider("Öneri sayısı", min_value=1, max_value=12, value=GRID_COLUMNS)
     st.caption(f"Veri setinde {len(paths)} görsel var.")
 
-query_image = None
-results = []
-
-if source == "Veri setinden seç":
-    selected = st.selectbox("Kıyafet", paths, format_func=label)
-    query_image = selected
-    results = recommend(selected, paths, features, top_n=top_n)
-else:
-    uploaded = st.file_uploader("Görsel yükle", type=[ext.lstrip(".") for ext in IMAGE_EXTENSIONS])
-    if uploaded is None:
-        st.info("Başlamak için bir kıyafet görseli yükleyin.")
+if source == "Metinle ara":
+    query = st.text_input("Aradığınız kıyafeti tarif edin (İngilizce)", placeholder="red sequined dress").strip()
+    if not query:
+        st.info("Başlamak için bir tarif yazın, ör. *black lace dress* veya *white trousers*.")
     else:
-        query_image = uploaded
-        with st.spinner("Benzer kıyafetler aranıyor..."):
-            results = recommend_for_upload(uploaded, paths, features, top_n)
+        text_paths, text_features = get_text_index()
+        st.subheader("Sonuçlar")
+        show_grid(search(query, text_paths, text_features, top_n=top_n, model=get_clip_model()))
+else:
+    query_image = None
+    results = []
 
-if query_image is not None:
-    left, right = st.columns([1, 3], gap="large")
-    with left:
-        st.subheader("Seçilen")
-        st.image(query_image if not isinstance(query_image, Path) else str(query_image), width="stretch")
-    with right:
-        st.subheader("Öneriler")
-        show_grid(results)
+    if source == "Veri setinden seç":
+        selected = st.selectbox("Kıyafet", paths, format_func=label)
+        query_image = selected
+        results = recommend(selected, paths, features, top_n=top_n)
+    else:
+        uploaded = st.file_uploader("Görsel yükle", type=[ext.lstrip(".") for ext in IMAGE_EXTENSIONS])
+        if uploaded is None:
+            st.info("Başlamak için bir kıyafet görseli yükleyin.")
+        else:
+            query_image = uploaded
+            with st.spinner("Benzer kıyafetler aranıyor..."):
+                results = recommend_for_upload(uploaded, paths, features, top_n)
+
+    if query_image is not None:
+        left, right = st.columns([1, 3], gap="large")
+        with left:
+            st.subheader("Seçilen")
+            st.image(query_image if not isinstance(query_image, Path) else str(query_image), width="stretch")
+        with right:
+            st.subheader("Öneriler")
+            show_grid(results)
