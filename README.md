@@ -31,6 +31,8 @@ Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yükl
 
 **Otomatik etiketler**: CLIP her görsele bir renk (siyah, beyaz, kırmızı, mavi, yeşil, pembe, sarı, mor, bej / kahverengi, gri / gümüş) ve bir tür (elbise, etnik, pantolonlu, etekli, ceket / üst) etiketi verir. Bunu, görselin vektörünü her etiketin tarif metniyle karşılaştırarak yapar; buna sıfır örnekli sınıflandırma denir. Dosya adlarıyla ölçülen doğruluk renkte %87, türde %85'tir. Etiketler `tags.npz` dosyasına önbelleklenir; etiket listesi veya model değişince yeniden hesaplanır.
 
+**Benzerlik yüzdesi** (arayüz): ham skorlar (cosine ya da z-skoru toplamı) yönteme göre farklı aralıklardadır ve doğrudan yüzde değildir; CLIP'te metin–görsel benzerliği 0,30 çok iyi bir eşleşmedir. Arayüz bu yüzden skoru, aynı yöntemle yapılan örnek aramaların **ilk 10 sonucundan** oluşan bir referans dağılımla karşılaştırır (`fashion_rec/calibration.py`): %80, tipik en iyi eşleşmelerin %80'inden daha benzer demektir. Yalnızca en iyi eşleşmelerin kullanılması yüzdeyi katalog büyüklüğünden bağımsız kılar (tüm çiftlerle kıyaslansaydı 44 bin üründe her sonuç %99,9 görünürdü): iki veri setinde de tipik bir sorgunun 1. sonucu medyanda %72–78, 4. sonucu %45–53 alır. Anlamsız sorgular %0'a yakın kalır ("uçak" → %0). Komut satırı ham skoru gösterir.
+
 Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı. Metinden aramada çok dilli model, 20 Türkçe sorgunun 19'unda doğru kıyafeti ilk 3'e getirdi (OpenAI CLIP: 3/20). Ayrıntılar `PROJE.md` ve `notebooks/` altında.
 
 ## Kurulum
@@ -175,8 +177,12 @@ fashion-recommender/
 │   ├── recommend.py      # benzerlik hesabı + öneri (isteğe bağlı renk ağırlığı)
 │   ├── color.py          # renk histogramı + önbellek
 │   ├── text_search.py    # çok dilli CLIP: metinden ve görsel + metin arama
-│   └── tags.py           # CLIP ile otomatik renk / tür etiketleri + filtre
+│   ├── tags.py           # CLIP ile otomatik renk / tür etiketleri + filtre
+│   ├── calibration.py    # ham skorları benzerlik yüzdesine çevirme
+│   ├── catalog.py        # ürün adları ve veri setinin kendi etiketleri (metadata.csv)
+│   └── backbone.py       # görsel öneri modeli seçimi (VGG16 / CLIP)
 ├── app.py                # Streamlit arayüzü
+├── scripts/              # veri seti içe aktarma
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları
 ├── docs/                 # README görselleri
@@ -187,6 +193,38 @@ fashion-recommender/
 
 Ayarlar (veri klasörü, önbellek yolları, görsel boyutu, batch boyutu, CLIP modeli) `fashion_rec/config.py` içindedir.
 
-## Veri seti
+## Veri setleri
 
-93 kadın kıyafeti görseli. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`) ve arayüzde etiket olarak kullanılır.
+Veri seti `FASHION_DATASET` ortam değişkeniyle seçilir; önbellekler `cache/<veri seti>/` altında ayrı tutulur.
+
+| ad | içerik | görsel öneri modeli |
+|---|---|---|
+| `women` (varsayılan) | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
+| `products` | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
+
+```bash
+FASHION_DATASET=products streamlit run app.py
+FASHION_DATASET=products python -m fashion_rec search "kız çocuk elbisesi"
+```
+
+**`products` kurulumu** (~4 GB disk): `scripts/import_products.py` dosyasının başındaki komutla Hugging Face'teki 384×512 kopyayı (`benitomartin/fashion-product-images-small-384x512`, 5 parquet dosyası, 2 GB) `data/products/raw/` altına indirin, sonra:
+
+```bash
+python scripts/import_products.py                       # görseller + metadata.csv
+FASHION_DATASET=products python -m fashion_rec index    # CLIP vektörleri (Apple GPU ile ~4 dk)
+```
+
+Bu veri setinde arayüzdeki filtreler CLIP tahminleri yerine ürünlerin kendi etiketlerinden gelir: **Cinsiyet** (Erkek / Kadın / Erkek Çocuk / Kız Çocuk / Unisex), **Kategori** (Giyim / Aksesuar / Ayakkabı / Kişisel Bakım…), **Ürün türü** ve **Renk**. Ürün seçici, açılır liste yerine ad aramasıyla çalışır.
+
+Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan alınmıştır; ticari kullanımdan önce hak durumunu kontrol edin.
+
+**Gerçek etiketlerle değerlendirme** (`notebooks/evaluate_products.py`): 5.000 ürünlük alt katalogda 1.000 sorgu, ilk 5 önerinin aynı etiketi taşıma oranı:
+
+| yöntem | ürün türü | renk | cinsiyet | ana kategori |
+|---|---|---|---|---|
+| VGG16 flatten | 0,755 | 0,266 | 0,837 | 0,987 |
+| VGG16 avg | 0,716 | 0,299 | 0,810 | 0,983 |
+| **CLIP görsel** | **0,810** | **0,334** | **0,874** | **0,992** |
+| CLIP + renk 0,3 | 0,762 | 0,440 | 0,858 | 0,988 |
+
+Metinden aramada 20 Türkçe/İngilizce sorgunun ilk 10 sonucunda ortalama isabet 0,74; zayıf olanlar "kemer" (0), "parfüm" (0), "yeşil kurta" (0,2), "kırmızı elbise" (0,3).

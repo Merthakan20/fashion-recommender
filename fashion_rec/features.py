@@ -1,5 +1,6 @@
 """Görsellerden CNN özellik vektörü çıkarma ve önbellekleme."""
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -28,10 +29,18 @@ def preprocess_image(path: Path) -> np.ndarray:
     return preprocess_input(img_to_array(img))
 
 
+def report_progress(done: int, total: int, label: str) -> None:
+    """Büyük kataloglarda (1000+ görsel) her ~%10'da bir ilerlemeyi stderr'e yazar."""
+    step = max(BATCH_SIZE, total // 10)
+    if total >= 1000 and (done % step < BATCH_SIZE or done >= total):
+        print(f"{label}: {min(done, total)}/{total}", file=sys.stderr, flush=True)
+
+
 def extract_features(model, paths: list[Path]) -> np.ndarray:
     """Her görsel için L2 normalize edilmiş, düzleştirilmiş özellik vektörü döndürür."""
     batches = []
     for start in range(0, len(paths), BATCH_SIZE):
+        report_progress(start + BATCH_SIZE, len(paths), "VGG16")
         batch = np.stack([preprocess_image(p) for p in paths[start:start + BATCH_SIZE]])
         out = model.predict(batch, verbose=0)
         batches.append(out.reshape(len(batch), -1))
@@ -68,5 +77,6 @@ def cached_features(paths: list[Path], cache_path: Path, compute, force: bool = 
             return cache["features"]
 
     features = compute()
+    Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
     np.savez(cache_path, features=features, names=np.array(names), key=np.array(key))
     return features

@@ -11,7 +11,7 @@ from fashion_rec.text_search import build_text_index
 def fake_index(data_dir, cache_path, model, monkeypatch):
     """CLI'nın gerçek veri seti yerine test görsellerini kullanmasını sağlar."""
     index = build_index(data_dir, cache_path, model=model)
-    monkeypatch.setattr(cli, "build_index", lambda force=False: index)
+    monkeypatch.setattr(cli, "build_image_index", lambda force=False: index)
     monkeypatch.setattr(cli, "build_color_index", lambda: build_color_index(data_dir, cache_path.with_name("color.npz")))
     return index
 

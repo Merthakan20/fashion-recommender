@@ -2,9 +2,10 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .DS_Store
-features.npz
-clip_features.npz
-color_features.npz
-tags.npz
 .venv/
 .pytest_cache/
+
+# Fashion Product Images veri seti (44 bin görsel, ~4 GB) ve veri setine özel önbellekler git dışında
+data/products/
+cache/
+notebooks/products_eval_cache.npz

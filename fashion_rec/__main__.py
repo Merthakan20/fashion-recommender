@@ -15,11 +15,19 @@ from pathlib import Path
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # TensorFlow log kalabalığını gizle
 
+from .catalog import display_name, load_metadata  # noqa: E402
 from .color import build_color_index  # noqa: E402
-from .features import build_index  # noqa: E402
+from .backbone import build_image_index, clip_encoder  # noqa: E402
+from .config import IMAGE_BACKBONE  # noqa: E402
 from .recommend import recommend  # noqa: E402
 from .tags import build_tag_index  # noqa: E402
 from .text_search import build_text_index, combined_search, load_clip_model, search  # noqa: E402
+
+
+def describe(path: Path, metadata) -> str:
+    """Satırda gösterilecek ad: metadata varsa ürün adı + dosya adı, yoksa dosya adı."""
+    name = display_name(path, metadata)
+    return f"{name}  ({path.name})" if path.name in metadata else path.name
 
 
 def positive_int(value: str) -> int:
@@ -37,9 +45,9 @@ def weight(value: str) -> float:
 
 
 def cmd_index(args) -> None:
-    paths, features = build_index(force=args.force)
-    print(f"{len(paths)} görsel indekslendi, vektör boyutu: {features.shape[1]}")
-    if args.text:
+    paths, features = build_image_index(force=args.force)
+    print(f"{len(paths)} görsel indekslendi ({IMAGE_BACKBONE}), vektör boyutu: {features.shape[1]}")
+    if args.text and IMAGE_BACKBONE != "clip":  # CLIP backbone'unda metin indeksi zaten aynı
         paths, features = build_text_index(force=args.force)
         print(f"{len(paths)} görsel metin araması için indekslendi, vektör boyutu: {features.shape[1]}")
 
@@ -49,14 +57,19 @@ def cmd_recommend(args) -> None:
     if not image.is_file():
         sys.exit(f"Hata: görsel bulunamadı: {image}")
 
-    paths, features = build_index()
+    paths, features = build_image_index()
     color_features = build_color_index()[1] if args.c > 0 else None
-    results = recommend(image, paths, features, top_n=args.n,
+    encode = None
+    if IMAGE_BACKBONE == "clip" and image.resolve() not in set(paths):
+        encode = clip_encoder(load_clip_model())
+    results = recommend(image, paths, features, top_n=args.n, encode=encode,
                         color_features=color_features, color_weight=args.c)
 
+    metadata = load_metadata()
     print(f"Girdi: {image.name}" + (f" (renk önemi {args.c})" if args.c > 0 else "") + "\n")
     for rank, (path, score) in enumerate(results, start=1):
-        print(f"{rank:>2}. {score:+.2f}  {path.name}" if args.c > 0 else f"{rank:>2}. {score:.3f}  {path.name}")
+        line = describe(path, metadata)
+        print(f"{rank:>2}. {score:+.2f}  {line}" if args.c > 0 else f"{rank:>2}. {score:.3f}  {line}")
 
 
 def cmd_search(args) -> None:
@@ -68,9 +81,10 @@ def cmd_search(args) -> None:
     paths, features = build_text_index(model=model)
     results = search(query, paths, features, top_n=args.n, model=model)
 
+    metadata = load_metadata()
     print(f"Sorgu: {query}\n")
     for rank, (path, score) in enumerate(results, start=1):
-        print(f"{rank:>2}. {score:.3f}  {path.name}")
+        print(f"{rank:>2}. {score:.3f}  {describe(path, metadata)}")
 
 
 def cmd_combine(args) -> None:
@@ -85,9 +99,10 @@ def cmd_combine(args) -> None:
     paths, features = build_text_index(model=model)
     results = combined_search(image, text, paths, features, top_n=args.n, text_weight=args.w, model=model)
 
+    metadata = load_metadata()
     print(f"Girdi: {image.name} + \"{text}\" (metin ağırlığı {args.w})\n")
     for rank, (path, score) in enumerate(results, start=1):
-        print(f"{rank:>2}. {score:+.2f}  {path.name}")
+        print(f"{rank:>2}. {score:+.2f}  {describe(path, metadata)}")
 
 
 def cmd_tags(args) -> None:
@@ -98,9 +113,10 @@ def cmd_tags(args) -> None:
         counts = ", ".join(f"{label} {n}" for label, n in Counter(labels).most_common())
         print(f"{group}: {counts}")
     if args.v:
+        metadata = load_metadata()
         print()
         for i, path in enumerate(paths):
-            print(f"{' · '.join(labels[i] for labels in tags.values()):<28}  {path.name}")
+            print(f"{' · '.join(labels[i] for labels in tags.values()):<28}  {describe(path, metadata)}")
 
 
 def main(argv=None) -> None:

@@ -62,3 +62,18 @@ def test_image_outside_dataset(tmp_path, index, model):
     assert model.calls > 0
     assert len(results) == 2
     assert results[0][0].name == "red.jpg"
+
+
+def test_image_outside_dataset_with_custom_encoder(tmp_path, index):
+    paths, feats = index
+    outside = tmp_path / "outside.jpg"
+    make_image(outside, (250, 10, 0))
+    calls = []
+
+    def encode(ps):
+        calls.append(ps)
+        return feats[[0]]  # katalogdaki ilk görselin vektörü
+
+    results = recommend(outside, paths, feats, top_n=1, encode=encode)
+    assert len(calls) == 1
+    assert results[0][0] == paths[0]

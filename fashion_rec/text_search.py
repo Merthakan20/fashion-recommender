@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 
 from .config import BATCH_SIZE, CLIP_CACHE_PATH, CLIP_MODEL, CLIP_PRETRAINED, DATA_DIR
-from .data import list_images
-from .features import cached_features
+from .data import catalog_index, list_images
+from .features import cached_features, report_progress
 from .recommend import zscore
 
 
@@ -20,8 +20,12 @@ class ClipModel:
     def __init__(self, arch: str = CLIP_MODEL, pretrained: str = CLIP_PRETRAINED):
         import open_clip  # torch yavaş açıldığı için import burada
 
+        import torch
+
+        # Apple GPU (MPS) varsa görsel kodlama çok daha hızlı; yoksa işlemci
+        self.device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(arch, pretrained=pretrained)
-        self.model.eval()
+        self.model.eval().to(self.device)
         self.tokenizer = open_clip.get_tokenizer(arch)
 
     def encode_images(self, paths: list[Path]) -> np.ndarray:
@@ -31,16 +35,17 @@ class ClipModel:
         batches = []
         with torch.no_grad():
             for start in range(0, len(paths), BATCH_SIZE):
+                report_progress(start + BATCH_SIZE, len(paths), "CLIP")
                 images = torch.stack([self.preprocess(Image.open(p).convert("RGB"))
-                                      for p in paths[start:start + BATCH_SIZE]])
-                batches.append(self.model.encode_image(images).numpy())
+                                      for p in paths[start:start + BATCH_SIZE]]).to(self.device)
+                batches.append(self.model.encode_image(images).float().cpu().numpy())
         return np.concatenate(batches)
 
     def encode_text(self, texts: list[str]) -> np.ndarray:
         import torch
 
         with torch.no_grad():
-            return self.model.encode_text(self.tokenizer(texts)).numpy()
+            return self.model.encode_text(self.tokenizer(texts).to(self.device)).float().cpu().numpy()
 
 
 def load_clip_model() -> ClipModel:
@@ -80,16 +85,15 @@ def combined_search(image_path: Path, text: str, paths: list[Path], features: np
         raise ValueError("text_weight 0 ile 1 arasında olmalı")
 
     model = model or load_clip_model()
-    image_path = Path(image_path).resolve()
-    resolved = [p.resolve() for p in paths]
+    query_index = catalog_index(paths)[1].get(Path(image_path).resolve())
 
-    if image_path in resolved:
-        image = features[resolved.index(image_path)]
+    if query_index is not None:
+        image = features[query_index]
     else:
         image = normalize(model.encode_images([image_path]))[0]
     text_vec = normalize(model.encode_text([text]))[0]
 
     scores = (1 - text_weight) * zscore(features @ image) + text_weight * zscore(features @ text_vec)
     ranked = np.argsort(scores)[::-1]
-    results = [(paths[i], float(scores[i])) for i in ranked if resolved[i] != image_path]
+    results = [(paths[i], float(scores[i])) for i in ranked if i != query_index]
     return results[:top_n]
