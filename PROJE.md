@@ -32,7 +32,8 @@ fashion-recommender/
 │   ├── data.py               # görsel listeleme
 │   ├── features.py           # model yükleme, özellik çıkarma, önbellek
 │   ├── recommend.py          # benzerlik hesabı + öneri
-│   └── text_search.py        # CLIP ile metinden arama
+│   ├── text_search.py        # CLIP ile metinden arama
+│   └── tags.py               # otomatik renk / tür etiketleri + filtre
 ├── app.py                    # Streamlit arayüzü
 ├── notebooks/                # deneme / görselleştirme notebook'ları
 ├── data/
@@ -91,7 +92,7 @@ fashion-recommender/
 ### Aşama 7 — Yeni özellikler
 - [x] Görsel + metin birlikte arama ("bunun gibi ama kırmızı") → `combined_search`, CLI `combine`, arayüzde "Değişiklik" kutusu
 - [x] Renk duyarlı benzerlik: orta bölge HSV histogramı + "renk önemi" kaydırıcısı (varsayılan 0) → `fashion_rec/color.py`, `recommend(color_weight=…)`, CLI `-c`
-- [ ] Otomatik etiketler ve filtreler: CLIP ile renk / tür etiketleri, kenar çubuğunda filtre
+- [x] Otomatik etiketler ve filtreler: CLIP ile renk / tür etiketleri, kenar çubuğunda filtre → `fashion_rec/tags.py`, CLI `tags`
 
 ## 5. Açık sorular / kararlar
 
@@ -168,3 +169,4 @@ fashion-recommender/
   | vgg + renk (orta), c=0,5 | 0,29 | 0,22 | 5,7 |
 
   Orta bölge (tüm görselden iyi: 0,37'ye karşı 0,25) seçildi. Kenar şeridinden arka plan rengini tahmin edip maskelemek de denendi; ölçütleri iyileştirmedi (renk@5 benzer, eş sırası kötü), bırakıldı. Net bir ödünleşim olduğu için tek bir ağırlık seçilmedi: **"renk önemi" kaydırıcısı, varsayılan 0** (eski davranış birebir korunuyor). Gözle: "sparkling black dress" için belirgin iyileşme (siyah payetliler öne geçiyor), "red velvet sheath midi dress" için karışık (gri fon yüzünden gümüş elbise öne çıkıyor). `fashion_rec/color.py` (önbellek `color_features.npz`, anahtar histogram ayarlarını içerir), `recommend(color_features=…, color_weight=…)`, CLI `recommend -c`, arayüzde "Renk önemi" kaydırıcısı (değişiklik metni varken devre dışı). `zscore` `recommend.py`'de tek yerde. Testler 64'e çıktı; ana test: sahte VGG16 kırmızıya en yakın olarak koyu kırmızıyı, renk ağırlığı açıkken açık kırmızıyı seçiyor; birleştirme devre dışı bırakılınca test düşüyor. Sıradaki adım: **otomatik etiketler ve filtreler**.
+- **2026-10-05** — Renk duyarlı benzerlik commit edildi (`7518639`). **Otomatik etiketler ve filtreler** eklendi. `notebooks/compare_tags.py` ile CLIP sıfır örnekli etiketleme dosya adlarından çıkan etiketlerle ölçüldü ve istem kalıpları karşılaştırıldı: renk 10 etiket, en iyi `"a {} outfit"` → **0,87** (60 görsel); tür 5 etiket (elbise, etnik, pantolonlu, etekli, ceket / üst), en iyi `"a photo of a woman wearing {}"` → **0,85** (89 görsel). En sık hata etekli kombinin "elbise" sayılması (4). Dağılım: elbise 65, etnik 16, pantolonlu 7, ceket / üst 3, etekli 2. `fashion_rec/tags.py` (`build_tag_index`, `filter_results`, önbellek `tags.npz`: anahtar CLIP modeli + etiket listesi; önbellek geçerliyse CLIP yüklenmez), CLI `tags [-v]`, arayüzde kenar çubuğunda Renk / Tür çoklu seçim filtreleri (üç modda da geçerli; grup içi "veya", gruplar arası "ve") ve kartlarda etiketler. Arama artık tüm adayları sıralayıp filtreden sonra ilk N'i alıyor. Testler 72'ye çıktı. Tarayıcıda denendi: "payetli elbise" + Tür=etnik → dört etnik kıyafet. **Aşama 7 tamamlandı.**

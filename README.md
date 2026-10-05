@@ -1,6 +1,6 @@
 # 👗 Fashion Recommender
 
-Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti Türkçe veya İngilizce tarif ederek de arama yapılabilir (ör. *kırmızı payetli elbise*). İkisi birleştirilebilir: bir kıyafet seçip "bunun gibi ama kırmızı" diye aranabilir.
+Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti Türkçe veya İngilizce tarif ederek de arama yapılabilir (ör. *kırmızı payetli elbise*). İkisi birleştirilebilir: bir kıyafet seçip "bunun gibi ama kırmızı" diye aranabilir. Sonuçlar otomatik renk ve tür etiketleriyle filtrelenebilir.
 
 Üç şekilde kullanılabilir:
 
@@ -28,6 +28,8 @@ Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yükl
 **Görsel + metin birlikte arama** ("bunun gibi ama kırmızı") yine CLIP ile yapılır. Her görsel için hem sorgu görseline hem değişiklik metnine olan benzerlik hesaplanır. İki benzerlik farklı ölçeklerde olduğundan (görsel–görsel ≈0,5–0,9, görsel–metin ≈0,15–0,3) ikisi de z-skoruna çevrilir ve metin ağırlığıyla toplanır (0 = yalnız görsel, 1 = yalnız metin, varsayılan 0,5). 14 örneklik bir testte doğru kıyafet 12'sinde ilk 3'e girdi (yalnız görsel: 4, yalnız metin: 8).
 
 **Renk önemi** (isteğe bağlı, varsayılan 0): VGG16 doku ve stile bakar, renge pek bakmaz. Renk önemi açılınca her görselin orta bölgesinden (arka planın etkisini azaltmak için) bir HSV renk histogramı çıkarılır ve VGG16 benzerliğiyle yine z-skoru + ağırlıkla birleştirilir. Ödünleşim vardır: 0,4'te renk tutarlılığı 0,17 → 0,26 artarken etnik/stil tutarlılığı 0,51 → 0,31 düşer. Bazı sorgularda belirgin iyileşme sağlar ("sparkling black dress" → siyah payetli elbiseler), arka planı geniş fotoğraflarda ise yanılabilir.
+
+**Otomatik etiketler**: CLIP her görsele bir renk (siyah, beyaz, kırmızı, mavi, yeşil, pembe, sarı, mor, bej / kahverengi, gri / gümüş) ve bir tür (elbise, etnik, pantolonlu, etekli, ceket / üst) etiketi verir. Bunu, görselin vektörünü her etiketin tarif metniyle karşılaştırarak yapar; buna sıfır örnekli sınıflandırma denir. Dosya adlarıyla ölçülen doğruluk renkte %87, türde %85'tir. Etiketler `tags.npz` dosyasına önbelleklenir; etiket listesi veya model değişince yeniden hesaplanır.
 
 Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı. Metinden aramada çok dilli model, 20 Türkçe sorgunun 19'unda doğru kıyafeti ilk 3'e getirdi (OpenAI CLIP: 3/20). Ayrıntılar `PROJE.md` ve `notebooks/` altında.
 
@@ -108,13 +110,24 @@ Girdi: royal blue off-shoulder dress.jpg + "yeşil" (metin ağırlığı 0.5)
 
 Buradaki skorlar z-skorlarının ağırlıklı toplamıdır; 0–1 aralığında değildir, yalnızca sıralama içindir.
 
+Otomatik etiketlerin dağılımını görmek için (`-v`: her görselin etiketleri):
+
+```bash
+python -m fashion_rec tags
+```
+
+```
+Renk: mavi 17, siyah 16, kırmızı 10, beyaz 9, bej / kahverengi 9, gri / gümüş 9, pembe 8, yeşil 7, mor 4, sarı 4
+Tür: elbise 65, etnik 16, pantolonlu 7, ceket / üst 3, etekli 2
+```
+
 ### Web arayüzü
 
 ```bash
 streamlit run app.py
 ```
 
-Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir. Görsel modlarında isteğe bağlı **Değişiklik** kutusuna bir şey yazılırsa (ör. *kırmızı*, *uzun kollu*) görsel + metin birlikte aranır; yanındaki kaydırıcı metnin ağırlığını ayarlar. Değişiklik kutusu boşken **Renk önemi** kaydırıcısıyla rengi benzer kıyafetler öne çıkarılabilir.
+Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir. Görsel modlarında isteğe bağlı **Değişiklik** kutusuna bir şey yazılırsa (ör. *kırmızı*, *uzun kollu*) görsel + metin birlikte aranır; yanındaki kaydırıcı metnin ağırlığını ayarlar. Değişiklik kutusu boşken **Renk önemi** kaydırıcısıyla rengi benzer kıyafetler öne çıkarılabilir. Kenar çubuğundaki **Filtreler** (renk, tür) her üç modda da sonuçları daraltır; bir grupta birden fazla etiket seçmek "veya", gruplar arası "ve" anlamına gelir. Her kartın altında o kıyafetin etiketleri görünür.
 
 ### Python'dan
 
@@ -161,7 +174,8 @@ fashion-recommender/
 │   ├── features.py       # model yükleme, özellik çıkarma, önbellek
 │   ├── recommend.py      # benzerlik hesabı + öneri (isteğe bağlı renk ağırlığı)
 │   ├── color.py          # renk histogramı + önbellek
-│   └── text_search.py    # çok dilli CLIP: metinden ve görsel + metin arama
+│   ├── text_search.py    # çok dilli CLIP: metinden ve görsel + metin arama
+│   └── tags.py           # CLIP ile otomatik renk / tür etiketleri + filtre
 ├── app.py                # Streamlit arayüzü
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları

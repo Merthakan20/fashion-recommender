@@ -3,6 +3,7 @@ import pytest
 import fashion_rec.__main__ as cli
 from fashion_rec.color import build_color_index
 from fashion_rec.features import build_index
+from fashion_rec.tags import build_tag_index
 from fashion_rec.text_search import build_text_index
 
 
@@ -19,6 +20,8 @@ def fake_index(data_dir, cache_path, model, monkeypatch):
 def fake_text_index(data_dir, tmp_path, clip_model, monkeypatch):
     index = build_text_index(data_dir, tmp_path / "clip.npz", model=clip_model)
     monkeypatch.setattr(cli, "build_text_index", lambda model=None, force=False: index)
+    monkeypatch.setattr(cli, "build_tag_index",
+                        lambda paths, feats: build_tag_index(paths, feats, tmp_path / "tags.npz", model=clip_model))
     monkeypatch.setattr(cli, "load_clip_model", lambda: clip_model)
     return index
 
@@ -107,3 +110,13 @@ def test_recommend_with_color_weight(data_dir, fake_index, capsys):
 def test_invalid_color_weight_is_rejected(data_dir, c):
     with pytest.raises(SystemExit):
         cli.main(["recommend", str(data_dir / "red.jpg"), "-c", c])
+
+
+def test_tags_prints_distribution(fake_text_index, monkeypatch, capsys):
+    import fashion_rec.tags as tags_module
+
+    monkeypatch.setattr(tags_module, "TAG_GROUPS", {"Renk": {"kırmızı": "red", "mavi": "blue"}})
+    cli.main(["tags", "-v"])
+    out = capsys.readouterr().out
+    assert out.startswith("Renk: ")
+    assert "kırmızı" in out and "red.jpg" in out

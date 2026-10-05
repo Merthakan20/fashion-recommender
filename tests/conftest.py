@@ -11,6 +11,7 @@ import pytest
 from PIL import Image
 
 import fashion_rec.features as features_module
+import fashion_rec.tags as tags_module
 import fashion_rec.text_search as text_search_module
 
 # `fashion_rec.recommend` paket seviyesinde fonksiyonu gösterir; modülün kendisi gerekiyor
@@ -77,6 +78,7 @@ def no_tensorflow(monkeypatch):
     monkeypatch.setattr(features_module, "load_model", fail_load_model)
     monkeypatch.setattr(recommend_module, "load_model", fail_load_model)
     monkeypatch.setattr(text_search_module, "load_clip_model", fail_load_model)
+    monkeypatch.setattr(tags_module, "load_clip_model", fail_load_model)
 
 
 @pytest.fixture

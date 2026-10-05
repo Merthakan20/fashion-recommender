@@ -4,11 +4,13 @@
     python -m fashion_rec recommend <görsel> [-n 5] [-c 0.4]
     python -m fashion_rec search "<metin>" [-n 5]
     python -m fashion_rec combine <görsel> "<metin>" [-n 5] [-w 0.5]
+    python -m fashion_rec tags [-v]
 """
 
 import argparse
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # TensorFlow log kalabalığını gizle
@@ -16,6 +18,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # TensorFlow log kalabalığ
 from .color import build_color_index  # noqa: E402
 from .features import build_index  # noqa: E402
 from .recommend import recommend  # noqa: E402
+from .tags import build_tag_index  # noqa: E402
 from .text_search import build_text_index, combined_search, load_clip_model, search  # noqa: E402
 
 
@@ -87,6 +90,19 @@ def cmd_combine(args) -> None:
         print(f"{rank:>2}. {score:+.2f}  {path.name}")
 
 
+def cmd_tags(args) -> None:
+    paths, clip_features = build_text_index()
+    tags = build_tag_index(paths, clip_features)
+
+    for group, labels in tags.items():
+        counts = ", ".join(f"{label} {n}" for label, n in Counter(labels).most_common())
+        print(f"{group}: {counts}")
+    if args.v:
+        print()
+        for i, path in enumerate(paths):
+            print(f"{' · '.join(labels[i] for labels in tags.values()):<28}  {path.name}")
+
+
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(prog="fashion_rec", description="Görsel benzerliğine dayalı kıyafet önerisi")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -115,6 +131,10 @@ def main(argv=None) -> None:
     p_comb.add_argument("-w", type=weight, default=0.5,
                         help="metin ağırlığı: 0 = yalnız görsel, 1 = yalnız metin (varsayılan: 0.5)")
     p_comb.set_defaults(func=cmd_combine)
+
+    p_tags = sub.add_parser("tags", help="otomatik renk / tür etiketlerinin dağılımını göster (CLIP)")
+    p_tags.add_argument("-v", action="store_true", help="her görselin etiketlerini de listele")
+    p_tags.set_defaults(func=cmd_tags)
 
     args = parser.parse_args(argv)
     args.func(args)
