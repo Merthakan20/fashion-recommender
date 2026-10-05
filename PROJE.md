@@ -36,7 +36,8 @@ fashion-recommender/
 │   ├── tags.py               # otomatik renk / tür etiketleri + filtre
 │   ├── calibration.py        # benzerlik yüzdesi
 │   ├── catalog.py            # ürün adları + metadata etiketleri
-│   └── backbone.py           # görsel öneri modeli seçimi
+│   ├── backbone.py           # görsel öneri modeli seçimi
+│   └── adapter.py            # CLIP adaptörü (isteğe bağlı)
 ├── app.py                    # Streamlit arayüzü
 ├── notebooks/                # deneme / görselleştirme notebook'ları
 ├── data/
@@ -177,3 +178,14 @@ fashion-recommender/
 - **2026-10-05** — **Açık veri seti eklendi**: Fashion Product Images (Kaggle MIT, Myntra görselleri), HF'deki 384×512 kopya, 44.072 ürün (Erkek 22.104, Kadın 18.357, Unisex 2.126, Erkek Çocuk 830, Kız Çocuk 655; Giyim 21.361, Aksesuar 11.244, Ayakkabı 9.197…). `scripts/import_products.py` parquet → `data/products/images/<id>.jpg` + `metadata.csv` (git dışında). Veri seti `FASHION_DATASET` ile seçiliyor (`women` varsayılan, `products`), önbellekler `cache/<veri seti>/` altında (kadın önbellekleri oraya taşındı). Ölçek için: `catalog_index` (yol → sıra, liste başına bir kez), CLIP Apple GPU'da (MPS; çıktı CPU ile aynı, cosine 0,99999994), 1000+ görselde ilerleme çıktısı. 44 bin ürün: CLIP 223 sn, renk 54 sn.
   **Gerçek etiketlerle ölçüm** (`notebooks/evaluate_products.py`, 5.000 ürünlük alt katalog, 1.000 sorgu, precision@5): CLIP görsel her alanda en iyi (ürün türü 0,810 / renk 0,334 / cinsiyet 0,874) — VGG16 flatten 0,755 / 0,266 / 0,837, avg 0,716 / 0,299 / 0,810. **Karar: `products` için görsel öneri modeli CLIP** (`config.IMAGE_BACKBONE`, `fashion_rec/backbone.py`); VGG16 flatten 44 bin üründe zaten ~4,4 GB tutardı. Metinden arama ilk 10 isabet ortalaması 0,74; "kemer", "parfüm" 0 — **model eğitimi için somut hedefler**.
   Arayüz: `products`'ta filtreler metadata'dan (Cinsiyet / Kategori / Ürün türü / Renk, Türkçe), ürün seçici kelime bazlı ad araması + en fazla 300 eşleşme. **Yüzde ölçeği düzeltildi**: tüm çiftlerle kıyas 44 bin üründe her sonucu %99,9+ gösteriyordu; referans artık örnek aramaların ilk 10 sonucu (`calibration.TOP_K`). Bu iki veri setinde de tutarlı: tipik sorgunun 1. sonucu medyanda %72–78, 4. sonucu %45–53; "uçak" %0. Testler 85.
+- **2026-10-05** — Veri seti + yüzde commit edildi (`45ceb64`). **Model eğitimi denendi** (`scripts/train_adapter.py`, `fashion_rec/adapter.py`): CLIP dondurulup görsel ve metin vektörlerine birer doğrusal katman (birim matrisle başlar, λ·‖W−I‖² cezası) eğitildi; karşıtlıklı (InfoNCE) kayıp, aynı metni taşıyan ürünler pozitif. Bölünme: eğitim 30.851 / doğrulama 4.407 / test 8.814 (test hiç görülmedi). Metin kaynağı × λ ızgarası doğrulamada:
+
+  | metin kaynağı | etiket sorguları | Türkçe sorgular |
+  |---|---|---|
+  | CLIP (adaptörsüz) | 0,710 | **0,774** |
+  | ürün adı, λ=0,1 | 0,688 | 0,747 |
+  | **şablon ("Women Silver Watches"), λ=0,1** | **0,748** | 0,753 |
+  | ad + şablon, λ=0,1 | 0,726 | 0,742 |
+
+  Testte seçilen ayar: etiket 0,754 → 0,768, Türkçe 0,742 → 0,753, görsel renk 0,355 → 0,379, görsel tür 0,821 → 0,816. Ürün adlarıyla eğitim zarar verdi (marka/model kelimelerine uyum). **Karar: adaptör kullanılmıyor** — kazanç 1–2 puan, küçük sorgu setlerinin gürültü payı içinde ve doğrulamada Türkçeyi geriletiyor. Altyapı yerinde: adaptör dosyası varsa `ClipModel` otomatik uygular ve önbellek anahtarı adaptör imzasını içerir (4 test).
+  Değerlendirme setinde hata bulundu ve düzeltildi: "parfüm" beklenen etiketi "Perfume and body mist" yazılmıştı (doğrusu "Body Mist"); "parfüm" aslında 1,0, metin araması ortalaması 0,74 değil **0,79**. **Asıl Türkçe darboğazı kelime dağarcığı**: "kemer" 0 / "belt" 1,0, "terlik" 0,3 / "flip flops" 1,0, "yeşil kurta" 0,3 / "green kurta" 0,6. Sıradaki adım önerisi: Türkçe moda terimleri sözlüğüyle sorguyu İngilizceye genişletme (eğitim gerektirmez).

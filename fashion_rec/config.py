@@ -32,6 +32,8 @@ CLIP_CACHE_PATH = CACHE_DIR / "clip_features.npz"
 # Çok dilli (Türkçe dahil) CLIP; karşılaştırma: notebooks/compare_multilingual.py
 CLIP_MODEL = "xlm-roberta-base-ViT-B-32"
 CLIP_PRETRAINED = "laion5b_s13b_b90k"
+# Veri setine özel eğitilmiş adaptör (scripts/train_adapter.py); dosya yoksa CLIP olduğu gibi kullanılır
+CLIP_ADAPTER_PATH = CACHE_DIR / "clip_adapter.npz"
 
 # Renk duyarlı benzerlik; karşılaştırma: notebooks/compare_color.py
 COLOR_CACHE_PATH = CACHE_DIR / "color_features.npz"

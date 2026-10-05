@@ -51,7 +51,7 @@ TEXT_QUERIES = [
     ("cüzdan", {"articleType": {"Wallets"}}),
     ("topuklu ayakkabı", {"articleType": {"Heels"}}),
     ("şort", {"articleType": {"Shorts"}}),
-    ("parfüm", {"articleType": {"Perfume and body mist", "Fragrance Gift Set", "Deodorant"}}),
+    ("parfüm", {"articleType": {"Perfume and Body Mist", "Fragrance Gift Set", "Deodorant"}}),
     ("küpe", {"articleType": {"Earrings"}}),
 ]
 

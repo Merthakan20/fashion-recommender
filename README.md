@@ -180,7 +180,8 @@ fashion-recommender/
 │   ├── tags.py           # CLIP ile otomatik renk / tür etiketleri + filtre
 │   ├── calibration.py    # ham skorları benzerlik yüzdesine çevirme
 │   ├── catalog.py        # ürün adları ve veri setinin kendi etiketleri (metadata.csv)
-│   └── backbone.py       # görsel öneri modeli seçimi (VGG16 / CLIP)
+│   ├── backbone.py       # görsel öneri modeli seçimi (VGG16 / CLIP)
+│   └── adapter.py        # CLIP üzerine eğitilmiş doğrusal adaptör (isteğe bağlı)
 ├── app.py                # Streamlit arayüzü
 ├── scripts/              # veri seti içe aktarma
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
@@ -227,4 +228,6 @@ Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan al�
 | **CLIP görsel** | **0,810** | **0,334** | **0,874** | **0,992** |
 | CLIP + renk 0,3 | 0,762 | 0,440 | 0,858 | 0,988 |
 
-Metinden aramada 20 Türkçe/İngilizce sorgunun ilk 10 sonucunda ortalama isabet 0,74; zayıf olanlar "kemer" (0), "parfüm" (0), "yeşil kurta" (0,2), "kırmızı elbise" (0,3).
+Metinden aramada 20 Türkçe/İngilizce sorgunun ilk 10 sonucunda ortalama isabet 0,79; zayıf olanlar "kemer" (0), "yeşil kurta" (0,2), "kırmızı elbise" (0,3). Zayıflığın kaynağı çoğunlukla Türkçe kelime dağarcığıdır: "kemer" 0 iken "belt" 1,0; "terlik" 0,3 iken "flip flops" 1,0.
+
+**Model eğitimi denemesi** (`scripts/train_adapter.py`): CLIP dondurulup üzerine doğrusal bir adaptör, görselleri ürün adlarıyla / etiket şablonlarıyla ("Women Silver Watches") eşleştirecek şekilde eğitildi; ürünlerin %20'si testte hiç görülmedi. En iyi ayar (şablon, λ=0,1) testte etiket sorgularını 0,754 → 0,768, Türkçe sorguları 0,742 → 0,753, görsel renk eşleşmesini 0,355 → 0,379 iyileştirdi; ama doğrulamada Türkçe sorgular 0,774 → 0,753 geriledi. Kazanç küçük ve gürültü payı içinde olduğu için adaptör **kullanılmıyor**; altyapı (`fashion_rec/adapter.py`) yerinde, `cache/<veri seti>/clip_adapter.npz` varsa otomatik devreye girer.

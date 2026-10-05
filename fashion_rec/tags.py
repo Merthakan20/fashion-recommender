@@ -5,9 +5,9 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import CLIP_MODEL, CLIP_PRETRAINED, TAG_CACHE_PATH
+from .config import TAG_CACHE_PATH
 from .features import cached_features
-from .text_search import load_clip_model, normalize
+from .text_search import clip_key, load_clip_model, normalize
 
 # grup -> {etiket: CLIP'e verilen tarif}; istemler notebooks/compare_tags.py ile seçildi
 # (doğruluk: renk 0,87, tür 0,85)
@@ -51,7 +51,7 @@ def build_tag_index(paths: list[Path], clip_features: np.ndarray, cache_path: Pa
             columns.append(np.argmax(clip_features @ text.T, axis=1))
         return np.stack(columns, axis=1)
 
-    key = f"{CLIP_MODEL}/{CLIP_PRETRAINED}/" + json.dumps(TAG_GROUPS, ensure_ascii=False, sort_keys=True)
+    key = clip_key() + "/" + json.dumps(TAG_GROUPS, ensure_ascii=False, sort_keys=True)
     indices = cached_features(paths, cache_path, compute, force, key=key)
     return {group: [list(labels)[i] for i in indices[:, g]] for g, (group, labels) in enumerate(TAG_GROUPS.items())}
 
