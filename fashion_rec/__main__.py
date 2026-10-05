@@ -3,6 +3,7 @@
     python -m fashion_rec index [--force] [--text]
     python -m fashion_rec recommend <görsel> [-n 5]
     python -m fashion_rec search "<metin>" [-n 5]
+    python -m fashion_rec combine <görsel> "<metin>" [-n 5] [-w 0.5]
 """
 
 import argparse
@@ -14,7 +15,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # TensorFlow log kalabalığ
 
 from .features import build_index  # noqa: E402
 from .recommend import recommend  # noqa: E402
-from .text_search import build_text_index, load_clip_model, search  # noqa: E402
+from .text_search import build_text_index, combined_search, load_clip_model, search  # noqa: E402
 
 
 def positive_int(value: str) -> int:
@@ -22,6 +23,13 @@ def positive_int(value: str) -> int:
     if n < 1:
         raise argparse.ArgumentTypeError("1 veya daha büyük olmalı")
     return n
+
+
+def weight(value: str) -> float:
+    w = float(value)
+    if not 0 <= w <= 1:
+        raise argparse.ArgumentTypeError("0 ile 1 arasında olmalı")
+    return w
 
 
 def cmd_index(args) -> None:
@@ -59,6 +67,23 @@ def cmd_search(args) -> None:
         print(f"{rank:>2}. {score:.3f}  {path.name}")
 
 
+def cmd_combine(args) -> None:
+    image = Path(args.image)
+    if not image.is_file():
+        sys.exit(f"Hata: görsel bulunamadı: {image}")
+    text = args.text.strip()
+    if not text:
+        sys.exit("Hata: değişiklik metni boş olamaz")
+
+    model = load_clip_model()
+    paths, features = build_text_index(model=model)
+    results = combined_search(image, text, paths, features, top_n=args.n, text_weight=args.w, model=model)
+
+    print(f"Girdi: {image.name} + \"{text}\" (metin ağırlığı {args.w})\n")
+    for rank, (path, score) in enumerate(results, start=1):
+        print(f"{rank:>2}. {score:+.2f}  {path.name}")
+
+
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(prog="fashion_rec", description="Görsel benzerliğine dayalı kıyafet önerisi")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -77,6 +102,14 @@ def main(argv=None) -> None:
     p_search.add_argument("query", help='arama metni, ör. "kırmızı payetli elbise"')
     p_search.add_argument("-n", type=positive_int, default=5, help="sonuç sayısı (varsayılan: 5)")
     p_search.set_defaults(func=cmd_search)
+
+    p_comb = sub.add_parser("combine", help='görsele benzeyen ama metne uyan kıyafetler ("bunun gibi ama kırmızı")')
+    p_comb.add_argument("image", help="girdi görselinin yolu")
+    p_comb.add_argument("text", help='değişiklik, ör. "kırmızı" veya "uzun kollu"')
+    p_comb.add_argument("-n", type=positive_int, default=5, help="sonuç sayısı (varsayılan: 5)")
+    p_comb.add_argument("-w", type=weight, default=0.5,
+                        help="metin ağırlığı: 0 = yalnız görsel, 1 = yalnız metin (varsayılan: 0.5)")
+    p_comb.set_defaults(func=cmd_combine)
 
     args = parser.parse_args(argv)
     args.func(args)

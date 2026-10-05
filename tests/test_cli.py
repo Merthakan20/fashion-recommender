@@ -70,3 +70,25 @@ def test_index_text_builds_both_indexes(fake_index, fake_text_index, capsys):
     out = capsys.readouterr().out
     assert "5 görsel indekslendi" in out
     assert "metin araması için indekslendi" in out
+
+
+def test_combine_prints_ranked_results(data_dir, fake_text_index, capsys):
+    cli.main(["combine", str(data_dir / "red.jpg"), "green", "-n", "2"])
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert lines[0] == 'Girdi: red.jpg + "green" (metin ağırlığı 0.5)'
+    assert lines[-2].startswith(" 1.") and "orange.png" in lines[-2]
+
+
+def test_combine_rejects_empty_text_and_missing_image(data_dir, fake_text_index):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["combine", str(data_dir / "red.jpg"), "  "])
+    assert "boş" in str(exc.value)
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["combine", "yok.jpg", "red"])
+    assert "bulunamadı" in str(exc.value)
+
+
+@pytest.mark.parametrize("w", ["-0.1", "1.5", "abc"])
+def test_combine_invalid_weight_is_rejected(data_dir, w):
+    with pytest.raises(SystemExit):
+        cli.main(["combine", str(data_dir / "red.jpg"), "red", "-w", w])

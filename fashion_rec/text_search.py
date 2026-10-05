@@ -65,3 +65,34 @@ def search(query: str, paths: list[Path], features: np.ndarray,
     similarities = features @ text
     ranked = np.argsort(similarities)[::-1][:top_n]
     return [(paths[i], float(similarities[i])) for i in ranked]
+
+
+def zscore(x: np.ndarray) -> np.ndarray:
+    return (x - x.mean()) / x.std()
+
+
+def combined_search(image_path: Path, text: str, paths: list[Path], features: np.ndarray,
+                    top_n: int = 5, text_weight: float = 0.5, model=None) -> list[tuple[Path, float]]:
+    """Görsele benzeyen ve metne uyan `top_n` görseli (yol, skor) olarak döndürür ("bunun gibi ama kırmızı").
+
+    Görsel–görsel ve görsel–metin benzerlikleri farklı ölçeklerde olduğundan
+    ikisi de z-skoruna çevrilip `text_weight` ile ağırlıklı toplanır
+    (0 = yalnız görsel, 1 = yalnız metin). Girdi görseli sonuçlardan çıkarılır.
+    """
+    if not 0 <= text_weight <= 1:
+        raise ValueError("text_weight 0 ile 1 arasında olmalı")
+
+    model = model or load_clip_model()
+    image_path = Path(image_path).resolve()
+    resolved = [p.resolve() for p in paths]
+
+    if image_path in resolved:
+        image = features[resolved.index(image_path)]
+    else:
+        image = normalize(model.encode_images([image_path]))[0]
+    text_vec = normalize(model.encode_text([text]))[0]
+
+    scores = (1 - text_weight) * zscore(features @ image) + text_weight * zscore(features @ text_vec)
+    ranked = np.argsort(scores)[::-1]
+    results = [(paths[i], float(scores[i])) for i in ranked if resolved[i] != image_path]
+    return results[:top_n]

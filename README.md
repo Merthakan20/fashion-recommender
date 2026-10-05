@@ -1,6 +1,6 @@
 # 👗 Fashion Recommender
 
-Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti Türkçe veya İngilizce tarif ederek de arama yapılabilir (ör. *kırmızı payetli elbise*).
+Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti Türkçe veya İngilizce tarif ederek de arama yapılabilir (ör. *kırmızı payetli elbise*). İkisi birleştirilebilir: bir kıyafet seçip "bunun gibi ama kırmızı" diye aranabilir.
 
 Üç şekilde kullanılabilir:
 
@@ -12,6 +12,8 @@ Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli ver
 
 ![Metinden arama](docs/text_search.png)
 
+![Görsel + metin: bunun gibi ama kırmızı](docs/combined_search.png)
+
 ## Nasıl çalışır
 
 1. `data/women fashion/` altındaki görseller listelenir (`.jpg`, `.jpeg`, `.png`, `.webp`).
@@ -22,6 +24,8 @@ Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli ver
 Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yüklenmez. Model yalnızca veri setinde olmayan bir görsel geldiğinde açılır.
 
 **Metinden arama** için çok dilli bir [CLIP](https://github.com/mlfoundations/open_clip) modeli (`xlm-roberta-base-ViT-B-32`, LAION-5B) kullanılır: görseller ve arama metni aynı vektör uzayına kodlanır, en yüksek cosine benzerliğine sahip görseller döner. Metin Türkçe veya İngilizce (ve diğer pek çok dilde) yazılabilir. CLIP vektörleri ayrı bir önbellekte (`clip_features.npz`) tutulur; önbellek modeli de kaydeder, model değişince otomatik yeniden hesaplanır.
+
+**Görsel + metin birlikte arama** ("bunun gibi ama kırmızı") yine CLIP ile yapılır. Her görsel için hem sorgu görseline hem değişiklik metnine olan benzerlik hesaplanır. İki benzerlik farklı ölçeklerde olduğundan (görsel–görsel ≈0,5–0,9, görsel–metin ≈0,15–0,3) ikisi de z-skoruna çevrilir ve metin ağırlığıyla toplanır (0 = yalnız görsel, 1 = yalnız metin, varsayılan 0,5). 14 örneklik bir testte doğru kıyafet 12'sinde ilk 3'e girdi (yalnız görsel: 4, yalnız metin: 8).
 
 Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı. Metinden aramada çok dilli model, 20 Türkçe sorgunun 19'unda doğru kıyafeti ilk 3'e getirdi (OpenAI CLIP: 3/20). Ayrıntılar `PROJE.md` ve `notebooks/` altında.
 
@@ -85,13 +89,29 @@ Sorgu: kırmızı payetli elbise
 
 CLIP skorları doğası gereği düşük ve birbirine yakındır (≈0,15–0,3); önemli olan sıralamadır. Her `search` çağrısı modeli yeniden yüklediği için ~10 sn sürer; arayüzde model bir kez yüklenir ve aramalar anında döner.
 
+Bir görsele benzeyen ama bir yönüyle farklı kıyafetler için (`-w`: metin ağırlığı, 0–1):
+
+```bash
+python -m fashion_rec combine "data/women fashion/royal blue off-shoulder dress.jpg" "yeşil" -n 3
+```
+
+```
+Girdi: royal blue off-shoulder dress.jpg + "yeşil" (metin ağırlığı 0.5)
+
+ 1. +2.05  flowing green off-shoulder dress.jpg
+ 2. +1.72  ark green, knee-length dress with short sleeves and a white, patterned neckline.jpg
+ 3. +1.62  light green, short dress with lace detailing around the waist and the edges of the sleeves and hem.jpg
+```
+
+Buradaki skorlar z-skorlarının ağırlıklı toplamıdır; 0–1 aralığında değildir, yalnızca sıralama içindir.
+
 ### Web arayüzü
 
 ```bash
 streamlit run app.py
 ```
 
-Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir.
+Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir. Görsel modlarında isteğe bağlı **Değişiklik** kutusuna bir şey yazılırsa (ör. *kırmızı*, *uzun kollu*) görsel + metin birlikte aranır; yanındaki kaydırıcı metnin ağırlığını ayarlar.
 
 ### Python'dan
 
@@ -108,6 +128,10 @@ from fashion_rec.text_search import build_text_index, load_clip_model, search
 clip = load_clip_model()
 paths, features = build_text_index(model=clip)
 results = search("black lace dress", paths, features, top_n=5, model=clip)
+
+from fashion_rec.text_search import combined_search
+
+results = combined_search("benim_elbisem.jpg", "kırmızı", paths, features, top_n=5, text_weight=0.5, model=clip)
 ```
 
 ## Testler
@@ -128,7 +152,7 @@ fashion-recommender/
 │   ├── data.py           # görsel listeleme
 │   ├── features.py       # model yükleme, özellik çıkarma, önbellek
 │   ├── recommend.py      # benzerlik hesabı + öneri
-│   └── text_search.py    # çok dilli CLIP ile metinden arama
+│   └── text_search.py    # çok dilli CLIP: metinden ve görsel + metin arama
 ├── app.py                # Streamlit arayüzü
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları

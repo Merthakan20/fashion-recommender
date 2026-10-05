@@ -88,6 +88,11 @@ fashion-recommender/
 ### Aşama 6 — Dokümantasyon
 - [x] `README.md`: proje tanımı, kurulum, CLI ve arayüz kullanımı, ekran görüntüsü (`docs/screenshot.png`)
 
+### Aşama 7 — Yeni özellikler
+- [x] Görsel + metin birlikte arama ("bunun gibi ama kırmızı") → `combined_search`, CLI `combine`, arayüzde "Değişiklik" kutusu
+- [ ] Renk duyarlı benzerlik: VGG16 vektörüne baskın renk bileşeni + "renk önemi" kaydırıcısı (ölçüt: `renk@5`)
+- [ ] Otomatik etiketler ve filtreler: CLIP ile renk / tür etiketleri, kenar çubuğunda filtre
+
 ## 5. Açık sorular / kararlar
 
 | Konu | Seçenekler | Öneri | Karar |
@@ -142,3 +147,13 @@ fashion-recommender/
   | **`xlm-roberta-base-ViT-B-32` (LAION)** | en | **0,95** | **1,00** | **0,97** |
 
   **Karar: LAION xlm-roberta modeline geçildi** — Türkçede büyük sıçrama, İngilizcede kayıp yok. Bedeli: ağırlıklar 605 MB → 1,46 GB, `transformers` yeni bağımlılık. Önbelleğe model kimliği (`key`) eklendi: iki model de 512 boyutlu olduğundan, eskiden model değişse bile eski vektörler sessizce kullanılırdı (2 yeni test, toplam 40). Arayüz ve CLI metinleri "Türkçe veya İngilizce" olarak güncellendi, README'ye metinden arama ekran görüntüsü eklendi. Not: sorgu seti küçük ve dosya adlarına dayalı; sonuçlar yön gösterici.
+- **2026-10-05** — Çok dilli CLIP commit edildi (`e10f1ef`). Aşama 7 açıldı; sıra: görsel + metin arama → renk duyarlı benzerlik → etiketler/filtreler. **Görsel + metin arama** eklendi. `notebooks/compare_combined.py` ile 14 örnekte (ör. `black, sequined dress` + "kırmızı" → `bright red, sequined dress`) yöntemler karşılaştırıldı:
+
+  | yöntem | hit@1 | hit@3 | MRR |
+  |---|---|---|---|
+  | yalnız görsel | 0,21 | 0,29 | 0,32 |
+  | yalnız metin | 0,29 | 0,57 | 0,49 |
+  | vektör toplamı, w=3 | 0,50 | 0,93 | 0,70 |
+  | **skor birleştirme (z-skoru), a=0,5** | 0,50 | 0,86 | 0,70 |
+
+  Vektör toplamı ile skor birleştirme berabere; skor birleştirme seçildi çünkü ağırlık 0–1 arası anlaşılır bir kaydırıcı (0 = yalnız görsel, 1 = yalnız metin) ve en iyisi tam ortada. `text_search.combined_search()`, CLI `combine <görsel> "<metin>" [-n] [-w]`, arayüzde görsel modlarına "Değişiklik (isteğe bağlı)" kutusu + metin ağırlığı kaydırıcısı; kutu boşsa eskisi gibi VGG16 kullanılır ve veri setinden seçimde model yine yüklenmez. Testler 53'e çıktı. Birleştirmeyi gerçekten sınayan iki test var: macenta, ne görselde (turuncu) ne metinde (mavi) birinci olduğu halde birleşik aramada birinci geliyor; metin benzerlikleri yapay olarak sıkıştırıldığında da z-skoru dengeyi koruyor. Ters ağırlık ve z-skorunun kaldırılması testlerce yakalandı. Not: örnek seti küçük; `sparkling black dress` + "kırmızı" hâlâ zayıf (doğru cevap 18. sırada). Sıradaki adım: **renk duyarlı benzerlik**.
