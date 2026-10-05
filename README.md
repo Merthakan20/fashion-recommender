@@ -27,6 +27,8 @@ Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yükl
 
 **Görsel + metin birlikte arama** ("bunun gibi ama kırmızı") yine CLIP ile yapılır. Her görsel için hem sorgu görseline hem değişiklik metnine olan benzerlik hesaplanır. İki benzerlik farklı ölçeklerde olduğundan (görsel–görsel ≈0,5–0,9, görsel–metin ≈0,15–0,3) ikisi de z-skoruna çevrilir ve metin ağırlığıyla toplanır (0 = yalnız görsel, 1 = yalnız metin, varsayılan 0,5). 14 örneklik bir testte doğru kıyafet 12'sinde ilk 3'e girdi (yalnız görsel: 4, yalnız metin: 8).
 
+**Renk önemi** (isteğe bağlı, varsayılan 0): VGG16 doku ve stile bakar, renge pek bakmaz. Renk önemi açılınca her görselin orta bölgesinden (arka planın etkisini azaltmak için) bir HSV renk histogramı çıkarılır ve VGG16 benzerliğiyle yine z-skoru + ağırlıkla birleştirilir. Ödünleşim vardır: 0,4'te renk tutarlılığı 0,17 → 0,26 artarken etnik/stil tutarlılığı 0,51 → 0,31 düşer. Bazı sorgularda belirgin iyileşme sağlar ("sparkling black dress" → siyah payetli elbiseler), arka planı geniş fotoğraflarda ise yanılabilir.
+
 Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı. Metinden aramada çok dilli model, 20 Türkçe sorgunun 19'unda doğru kıyafeti ilk 3'e getirdi (OpenAI CLIP: 3/20). Ayrıntılar `PROJE.md` ve `notebooks/` altında.
 
 ## Kurulum
@@ -59,6 +61,7 @@ Bir görsele benzeyen kıyafetleri önermek için:
 
 ```bash
 python -m fashion_rec recommend "data/women fashion/black floral saree.jpg" -n 5
+python -m fashion_rec recommend "data/women fashion/sparkling black dress.jpg" -n 5 -c 0.5   # renk önemi 0.5
 ```
 
 ```
@@ -111,7 +114,7 @@ Buradaki skorlar z-skorlarının ağırlıklı toplamıdır; 0–1 aralığında
 streamlit run app.py
 ```
 
-Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir. Görsel modlarında isteğe bağlı **Değişiklik** kutusuna bir şey yazılırsa (ör. *kırmızı*, *uzun kollu*) görsel + metin birlikte aranır; yanındaki kaydırıcı metnin ağırlığını ayarlar.
+Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir. Görsel modlarında isteğe bağlı **Değişiklik** kutusuna bir şey yazılırsa (ör. *kırmızı*, *uzun kollu*) görsel + metin birlikte aranır; yanındaki kaydırıcı metnin ağırlığını ayarlar. Değişiklik kutusu boşken **Renk önemi** kaydırıcısıyla rengi benzer kıyafetler öne çıkarılabilir.
 
 ### Python'dan
 
@@ -122,6 +125,11 @@ from fashion_rec.recommend import recommend
 paths, features = build_index()
 for path, score in recommend("benim_elbisem.jpg", paths, features, top_n=5):
     print(f"{score:.3f}  {path.name}")
+
+from fashion_rec.color import build_color_index
+
+_, colors = build_color_index()
+results = recommend("benim_elbisem.jpg", paths, features, color_features=colors, color_weight=0.4)
 
 from fashion_rec.text_search import build_text_index, load_clip_model, search
 
@@ -151,7 +159,8 @@ fashion-recommender/
 │   ├── config.py         # yollar, görsel boyutu, batch boyutu
 │   ├── data.py           # görsel listeleme
 │   ├── features.py       # model yükleme, özellik çıkarma, önbellek
-│   ├── recommend.py      # benzerlik hesabı + öneri
+│   ├── recommend.py      # benzerlik hesabı + öneri (isteğe bağlı renk ağırlığı)
+│   ├── color.py          # renk histogramı + önbellek
 │   └── text_search.py    # çok dilli CLIP: metinden ve görsel + metin arama
 ├── app.py                # Streamlit arayüzü
 ├── data/women fashion/   # 93 kadın kıyafeti görseli

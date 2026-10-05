@@ -4,5 +4,6 @@ __pycache__/
 .DS_Store
 features.npz
 clip_features.npz
+color_features.npz
 .venv/
 .pytest_cache/

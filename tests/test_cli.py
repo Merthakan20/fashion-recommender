@@ -1,6 +1,7 @@
 import pytest
 
 import fashion_rec.__main__ as cli
+from fashion_rec.color import build_color_index
 from fashion_rec.features import build_index
 from fashion_rec.text_search import build_text_index
 
@@ -10,6 +11,7 @@ def fake_index(data_dir, cache_path, model, monkeypatch):
     """CLI'nın gerçek veri seti yerine test görsellerini kullanmasını sağlar."""
     index = build_index(data_dir, cache_path, model=model)
     monkeypatch.setattr(cli, "build_index", lambda force=False: index)
+    monkeypatch.setattr(cli, "build_color_index", lambda: build_color_index(data_dir, cache_path.with_name("color.npz")))
     return index
 
 
@@ -92,3 +94,16 @@ def test_combine_rejects_empty_text_and_missing_image(data_dir, fake_text_index)
 def test_combine_invalid_weight_is_rejected(data_dir, w):
     with pytest.raises(SystemExit):
         cli.main(["combine", str(data_dir / "red.jpg"), "red", "-w", w])
+
+
+def test_recommend_with_color_weight(data_dir, fake_index, capsys):
+    cli.main(["recommend", str(data_dir / "red.jpg"), "-n", "2", "-c", "0.5"])
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert lines[0] == "Girdi: red.jpg (renk önemi 0.5)"
+    assert lines[-2].startswith(" 1.") and ("+" in lines[-2] or "-" in lines[-2])
+
+
+@pytest.mark.parametrize("c", ["-0.1", "1.5", "abc"])
+def test_invalid_color_weight_is_rejected(data_dir, c):
+    with pytest.raises(SystemExit):
+        cli.main(["recommend", str(data_dir / "red.jpg"), "-c", c])

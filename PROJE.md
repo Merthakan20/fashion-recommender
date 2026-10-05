@@ -90,7 +90,7 @@ fashion-recommender/
 
 ### Aşama 7 — Yeni özellikler
 - [x] Görsel + metin birlikte arama ("bunun gibi ama kırmızı") → `combined_search`, CLI `combine`, arayüzde "Değişiklik" kutusu
-- [ ] Renk duyarlı benzerlik: VGG16 vektörüne baskın renk bileşeni + "renk önemi" kaydırıcısı (ölçüt: `renk@5`)
+- [x] Renk duyarlı benzerlik: orta bölge HSV histogramı + "renk önemi" kaydırıcısı (varsayılan 0) → `fashion_rec/color.py`, `recommend(color_weight=…)`, CLI `-c`
 - [ ] Otomatik etiketler ve filtreler: CLIP ile renk / tür etiketleri, kenar çubuğunda filtre
 
 ## 5. Açık sorular / kararlar
@@ -157,3 +157,14 @@ fashion-recommender/
   | **skor birleştirme (z-skoru), a=0,5** | 0,50 | 0,86 | 0,70 |
 
   Vektör toplamı ile skor birleştirme berabere; skor birleştirme seçildi çünkü ağırlık 0–1 arası anlaşılır bir kaydırıcı (0 = yalnız görsel, 1 = yalnız metin) ve en iyisi tam ortada. `text_search.combined_search()`, CLI `combine <görsel> "<metin>" [-n] [-w]`, arayüzde görsel modlarına "Değişiklik (isteğe bağlı)" kutusu + metin ağırlığı kaydırıcısı; kutu boşsa eskisi gibi VGG16 kullanılır ve veri setinden seçimde model yine yüklenmez. Testler 53'e çıktı. Birleştirmeyi gerçekten sınayan iki test var: macenta, ne görselde (turuncu) ne metinde (mavi) birinci olduğu halde birleşik aramada birinci geliyor; metin benzerlikleri yapay olarak sıkıştırıldığında da z-skoru dengeyi koruyor. Ters ağırlık ve z-skorunun kaldırılması testlerce yakalandı. Not: örnek seti küçük; `sparkling black dress` + "kırmızı" hâlâ zayıf (doğru cevap 18. sırada). Sıradaki adım: **renk duyarlı benzerlik**.
+- **2026-10-05** — Görsel + metin arama commit edildi (`5c2841a`). **Renk duyarlı benzerlik** eklendi. `notebooks/compare_color.py` ile HSV renk histogramı (12×3×3, karekök + L2) VGG16 ile z-skoru + ağırlıkla birleştirildi:
+
+  | yöntem | renk@5 | etnik@5 | eş sırası |
+  |---|---|---|---|
+  | vgg16 | 0,17 | 0,51 | 5,8 |
+  | yalnız renk (orta bölge) | 0,37 | 0,04 | 29,8 |
+  | vgg + renk (orta), c=0,3 | 0,23 | 0,38 | 5,2 |
+  | vgg + renk (orta), c=0,4 | 0,26 | 0,31 | 4,8 |
+  | vgg + renk (orta), c=0,5 | 0,29 | 0,22 | 5,7 |
+
+  Orta bölge (tüm görselden iyi: 0,37'ye karşı 0,25) seçildi. Kenar şeridinden arka plan rengini tahmin edip maskelemek de denendi; ölçütleri iyileştirmedi (renk@5 benzer, eş sırası kötü), bırakıldı. Net bir ödünleşim olduğu için tek bir ağırlık seçilmedi: **"renk önemi" kaydırıcısı, varsayılan 0** (eski davranış birebir korunuyor). Gözle: "sparkling black dress" için belirgin iyileşme (siyah payetliler öne geçiyor), "red velvet sheath midi dress" için karışık (gri fon yüzünden gümüş elbise öne çıkıyor). `fashion_rec/color.py` (önbellek `color_features.npz`, anahtar histogram ayarlarını içerir), `recommend(color_features=…, color_weight=…)`, CLI `recommend -c`, arayüzde "Renk önemi" kaydırıcısı (değişiklik metni varken devre dışı). `zscore` `recommend.py`'de tek yerde. Testler 64'e çıktı; ana test: sahte VGG16 kırmızıya en yakın olarak koyu kırmızıyı, renk ağırlığı açıkken açık kırmızıyı seçiyor; birleştirme devre dışı bırakılınca test düşüyor. Sıradaki adım: **otomatik etiketler ve filtreler**.

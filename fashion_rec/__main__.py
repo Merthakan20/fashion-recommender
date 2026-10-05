@@ -1,7 +1,7 @@
 """Komut satırı arayüzü.
 
     python -m fashion_rec index [--force] [--text]
-    python -m fashion_rec recommend <görsel> [-n 5]
+    python -m fashion_rec recommend <görsel> [-n 5] [-c 0.4]
     python -m fashion_rec search "<metin>" [-n 5]
     python -m fashion_rec combine <görsel> "<metin>" [-n 5] [-w 0.5]
 """
@@ -13,6 +13,7 @@ from pathlib import Path
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # TensorFlow log kalabalığını gizle
 
+from .color import build_color_index  # noqa: E402
 from .features import build_index  # noqa: E402
 from .recommend import recommend  # noqa: E402
 from .text_search import build_text_index, combined_search, load_clip_model, search  # noqa: E402
@@ -46,11 +47,13 @@ def cmd_recommend(args) -> None:
         sys.exit(f"Hata: görsel bulunamadı: {image}")
 
     paths, features = build_index()
-    results = recommend(image, paths, features, top_n=args.n)
+    color_features = build_color_index()[1] if args.c > 0 else None
+    results = recommend(image, paths, features, top_n=args.n,
+                        color_features=color_features, color_weight=args.c)
 
-    print(f"Girdi: {image.name}\n")
+    print(f"Girdi: {image.name}" + (f" (renk önemi {args.c})" if args.c > 0 else "") + "\n")
     for rank, (path, score) in enumerate(results, start=1):
-        print(f"{rank:>2}. {score:.3f}  {path.name}")
+        print(f"{rank:>2}. {score:+.2f}  {path.name}" if args.c > 0 else f"{rank:>2}. {score:.3f}  {path.name}")
 
 
 def cmd_search(args) -> None:
@@ -96,6 +99,8 @@ def main(argv=None) -> None:
     p_rec = sub.add_parser("recommend", help="bir görsele benzeyen kıyafetleri öner")
     p_rec.add_argument("image", help="girdi görselinin yolu")
     p_rec.add_argument("-n", type=positive_int, default=5, help="öneri sayısı (varsayılan: 5)")
+    p_rec.add_argument("-c", type=weight, default=0.0,
+                       help="renk önemi: 0 = yalnız VGG16, 1 = yalnız renk (varsayılan: 0)")
     p_rec.set_defaults(func=cmd_recommend)
 
     p_search = sub.add_parser("search", help="metne uyan kıyafetleri bul (CLIP, Türkçe veya İngilizce)")

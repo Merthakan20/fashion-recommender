@@ -7,6 +7,7 @@ import numpy as np
 from .config import BATCH_SIZE, CLIP_CACHE_PATH, CLIP_MODEL, CLIP_PRETRAINED, DATA_DIR
 from .data import list_images
 from .features import cached_features
+from .recommend import zscore
 
 
 def normalize(x: np.ndarray) -> np.ndarray:
@@ -65,10 +66,6 @@ def search(query: str, paths: list[Path], features: np.ndarray,
     similarities = features @ text
     ranked = np.argsort(similarities)[::-1][:top_n]
     return [(paths[i], float(similarities[i])) for i in ranked]
-
-
-def zscore(x: np.ndarray) -> np.ndarray:
-    return (x - x.mean()) / x.std()
 
 
 def combined_search(image_path: Path, text: str, paths: list[Path], features: np.ndarray,
