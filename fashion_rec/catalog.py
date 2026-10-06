@@ -6,6 +6,7 @@ ve etiketleri oradan okunur; yoksa dosya adı ürün adı olarak kullanılır
 """
 
 import csv
+import re
 from pathlib import Path
 
 from .config import DATA_DIR, METADATA_FILE
@@ -42,6 +43,28 @@ LABEL_GROUPS = {
 }
 
 
+_GIRL = re.compile(r"\bgirls?\b|\bgirl's\b", re.IGNORECASE)
+_BOY = re.compile(r"\bboys?\b|\bboy's\b", re.IGNORECASE)
+
+
+def corrected_gender(row: dict[str, str]) -> str:
+    """Cinsiyet etiketi; adı açıkça çocuk ürünü diyorsa ona göre düzeltilir.
+
+    Fashion Product Images'ta adında "girl" geçen 185 ürün "Women", "boy"
+    geçen 210 ürün "Men" etiketli (ör. "Doodle Girl Little Princess Pink
+    Tops"); bu, çocuk ürünlerinin ~%23'ü demek. "boyfriend" gibi kelimeler
+    kelime sınırı sayesinde etkilenmez.
+    """
+    gender = row.get("gender", "")
+    name = row.get("name", "")
+    if gender in ("Women", "Men", ""):
+        if _GIRL.search(name):
+            return "Girls"
+        if _BOY.search(name):
+            return "Boys"
+    return gender
+
+
 def metadata_tags(paths: list[Path], metadata: Metadata) -> dict[str, dict[str, str]]:
     """Dosya adı -> {grup: etiket}; veri setinin kendi etiketlerinden (yoksa boş sözlük).
 
@@ -51,7 +74,35 @@ def metadata_tags(paths: list[Path], metadata: Metadata) -> dict[str, dict[str, 
         return {}
     lookup = {}
     for p in paths:
-        row = metadata.get(p.name, {})
+        row = dict(metadata.get(p.name, {}))
+        if row:
+            row["gender"] = corrected_gender(row)
         lookup[p.name] = {group: translations.get(row.get(column, ""), row.get(column, "")) or "—"
                           for group, (column, translations) in LABEL_GROUPS.items()}
     return lookup
+
+
+# Bölümler: aksesuarlar cinsiyetten bağımsız tek bölüm, diğer ürünler (giyim, ayakkabı, kişisel bakım) cinsiyete göre
+SEGMENTS = ["Kadın", "Erkek", "Kız Çocuk", "Erkek Çocuk", "Aksesuar", "Unisex"]
+
+
+def segment_of(row: dict[str, str]) -> str | None:
+    """Ürünün bölümü; metadata'sı yoksa None."""
+    if not row:
+        return None
+    if row.get("masterCategory") == "Accessories":
+        return "Aksesuar"
+    return LABEL_GROUPS["Cinsiyet"][1].get(corrected_gender(row)) or None
+
+
+def segments(paths: list[Path], metadata: Metadata) -> list[str | None]:
+    return [segment_of(metadata.get(p.name, {})) for p in paths]
+
+
+def majority_segment(results: list[tuple[Path, float]], segment_by_name: dict[str, str | None], k: int = 20) -> str | None:
+    """Katalog dışı bir görselin bölümü: en yakın `k` komşunun en sık bölümü."""
+    from collections import Counter
+
+    votes = Counter(segment_by_name.get(p.name) for p, _ in results[:k])
+    votes.pop(None, None)
+    return votes.most_common(1)[0][0] if votes else None

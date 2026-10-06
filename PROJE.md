@@ -38,7 +38,8 @@ fashion-recommender/
 │   ├── catalog.py            # ürün adları + metadata etiketleri
 │   ├── backbone.py           # görsel öneri modeli seçimi
 │   ├── adapter.py            # CLIP adaptörü (isteğe bağlı)
-│   └── glossary.py           # Türkçe moda sözlüğü
+│   ├── glossary.py           # Türkçe moda sözlüğü
+│   └── segment_settings.*    # bölüm bazında ayarlar
 ├── app.py                    # Streamlit arayüzü
 ├── notebooks/                # deneme / görselleştirme notebook'ları
 ├── data/
@@ -198,3 +199,5 @@ fashion-recommender/
   | ayrık (30) | 0,680 | **0,830** | 0,833 |
 
   Yöntem geliştirme setinde seçildi: **yalnız çeviri** (`text_search.encode_query`; metin araması ve "bunun gibi ama…" değişikliği). Kazananlar: "erkek kemer" 0 → 1,0, "sütyen" 0,1 → 0,9, "kazak" 0 → 0,9, "terlik" 0,3 → 1,0, "kadın tayt" 0,3 → 0,8. Gerileyenler: "topuklu ayakkabı" 1,0 → 0,7, "erkek şort" 1,0 → 0,7, "mor elbise" 0,5 → 0,3, "beyaz tişört" 0,8 → 0,7. Arayüz çeviriyi "Sözlükle aranan: …" diye gösteriyor. Testler 107 (sözlük + sahte modelle Türkçe sorgunun aramaya ulaştığı test). Model eğitimiyle (adaptör, +1 puan) karşılaştırınca sözlük çok daha etkili: Türkçe darboğazı kelime dağarcığıydı.
+- **2026-10-06** — Sözlük commit edildi (`21ce333`); 44 bin ürünlük veri seti indirilmişse varsayılan oldu (`ef1c160`; testler `FASHION_DATASET=women` ile ortamdan bağımsız). **Bölüm bazında ayarlar** (kullanıcının ilk istediği Erkek / Kadın / Erkek Çocuk / Kız Çocuk / Aksesuar ayrımı): `catalog.segment_of` (aksesuar cinsiyetten önce), arayüzde "Aynı bölümden öner" (varsayılan açık), yüklenen görsel için 20 komşu çoğunluğuyla bölüm tahmini, bölüme göre varsayılan renk önemi, bölüm içi yüzde ölçeği (`calibration.image_scale/combined_scale(subset=…)`). `scripts/tune_segments.py` her bölüm için renk önemini 0–0,6 arasında tarıyor (hedef: tür + renk isabeti ortalaması; sorguların yarısıyla seçilip yarısında ölçülüyor) ve `fashion_rec/segment_settings.json`'a yazıyor. Seçilenler: Kadın 0,2, Erkek 0,3, Kız Çocuk 0,2, Erkek Çocuk 0,4, Aksesuar 0,5, Unisex 0,4. Aynı bölüm kısıtlaması cinsiyet isabetini çocuklarda 0,85 → 1,00, Kadın/Erkek'te 0,94–0,96 → 1,00 yapıyor; ürün türü de hafif artıyor.
+  **Etiket hatası bulundu**: adında "girl" geçen 185 ürün "Women", "boy" geçen 210 ürün "Men" etiketli (çocuk ürünlerinin ~%23'ü; "Doodle Girl", "Palm Tree Kids Girls" gibi). `catalog.corrected_gender` adına göre düzeltiyor (kelime sınırı: "boyfriend" etkilenmez); bölümler, Cinsiyet filtresi ve ayar ölçümü düzeltilmiş cinsiyeti kullanıyor. Kız Çocuk 627 → 807, Erkek Çocuk 813 → 1.030 ürün. Not: hedef "tür ve renk eşit önemli" varsayımına dayanıyor; renk önemi arttıkça tür isabeti düşüyor (ör. Erkek Çocuk 0,921 → 0,864). Testler 112.

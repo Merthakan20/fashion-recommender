@@ -1,0 +1,22 @@
+{
+  "products": {
+    "Kadın": {
+      "color_weight": 0.2
+    },
+    "Erkek": {
+      "color_weight": 0.3
+    },
+    "Kız Çocuk": {
+      "color_weight": 0.2
+    },
+    "Erkek Çocuk": {
+      "color_weight": 0.4
+    },
+    "Aksesuar": {
+      "color_weight": 0.5
+    },
+    "Unisex": {
+      "color_weight": 0.4
+    }
+  }
+}

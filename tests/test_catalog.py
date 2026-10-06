@@ -47,3 +47,35 @@ def test_metadata_tags_translate_and_fill_missing(data_dir):
                                  "Renk": "Red"}
     assert lookup["blue.jpeg"]["Cinsiyet"] == "—"  # metadata'da olmayan ürün
     assert metadata_tags(paths, {}) == {}
+
+
+def test_segment_of_rules():
+    from fashion_rec.catalog import segment_of
+
+    assert segment_of({"gender": "Women", "masterCategory": "Apparel"}) == "Kadın"
+    assert segment_of({"gender": "Boys", "masterCategory": "Footwear"}) == "Erkek Çocuk"
+    assert segment_of({"gender": "Men", "masterCategory": "Accessories"}) == "Aksesuar"  # aksesuar cinsiyetten önce
+    assert segment_of({"gender": "Unisex", "masterCategory": "Apparel"}) == "Unisex"
+    assert segment_of({}) is None
+
+
+def test_majority_segment():
+    from pathlib import Path
+
+    from fashion_rec.catalog import majority_segment
+
+    results = [(Path(n), 0.0) for n in ("a", "b", "c", "d")]
+    lookup = {"a": "Kadın", "b": "Erkek", "c": "Kadın", "d": None}
+    assert majority_segment(results, lookup) == "Kadın"
+    assert majority_segment(results[3:], lookup) is None
+
+
+def test_corrected_gender_fixes_kids_items_labelled_as_adults():
+    from fashion_rec.catalog import corrected_gender, segment_of
+
+    assert corrected_gender({"gender": "Women", "name": "Doodle Girl Little Princess Pink Tops"}) == "Girls"
+    assert corrected_gender({"gender": "Men", "name": "Doodle Boy D Print Red Tshirts"}) == "Boys"
+    assert corrected_gender({"gender": "Women", "name": "Palm Tree Girl's Cr Blossom Drs Pink Dresses"}) == "Girls"
+    assert corrected_gender({"gender": "Women", "name": "Levis Women Boyfriend Jeans"}) == "Women"  # "boyfriend" değil
+    assert corrected_gender({"gender": "Unisex", "name": "Kids Girls Cap"}) == "Unisex"  # yalnız yetişkin etiketleri düzeltilir
+    assert segment_of({"gender": "Women", "masterCategory": "Apparel", "name": "Gini and Jony Kids Girls Tops"}) == "Kız Çocuk"

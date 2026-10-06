@@ -182,7 +182,9 @@ fashion-recommender/
 │   ├── catalog.py        # ürün adları ve veri setinin kendi etiketleri (metadata.csv)
 │   ├── backbone.py       # görsel öneri modeli seçimi (VGG16 / CLIP)
 │   ├── adapter.py        # CLIP üzerine eğitilmiş doğrusal adaptör (isteğe bağlı)
-│   └── glossary.py       # Türkçe moda terimleri sözlüğü (sorgu çevirisi)
+│   ├── glossary.py       # Türkçe moda terimleri sözlüğü (sorgu çevirisi)
+│   ├── segment_settings.py   # bölüm bazında ayarlar
+│   └── segment_settings.json # scripts/tune_segments.py çıktısı
 ├── app.py                # Streamlit arayüzü
 ├── scripts/              # veri seti içe aktarma
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
@@ -218,6 +220,18 @@ FASHION_DATASET=products python -m fashion_rec index    # CLIP vektörleri (Appl
 ```
 
 Bu veri setinde arayüzdeki filtreler CLIP tahminleri yerine ürünlerin kendi etiketlerinden gelir: **Cinsiyet** (Erkek / Kadın / Erkek Çocuk / Kız Çocuk / Unisex), **Kategori** (Giyim / Aksesuar / Ayakkabı / Kişisel Bakım…), **Ürün türü** ve **Renk**. Ürün seçici, açılır liste yerine ad aramasıyla çalışır.
+
+**Bölümler**: ürünler Kadın / Erkek / Kız Çocuk / Erkek Çocuk / Aksesuar bölümlerine ayrılır (aksesuarlar cinsiyetten bağımsız; birkaç yüz unisex ürün ayrı). Arayüzde **Aynı bölümden öner** (varsayılan açık) önerileri seçilen ürünün bölümüyle sınırlar; yüklenen görselin bölümü en yakın 20 komşunun çoğunluğundan tahmin edilir. **Renk önemi** her bölüm için ölçülmüş değerle açılır (`scripts/tune_segments.py` → `fashion_rec/segment_settings.json`; hedef: ürün türü ve renk isabetinin ortalaması, sorguların yarısında seçilip diğer yarısında ölçülür):
+
+| bölüm | ürün | cinsiyet isabeti: tüm katalog → aynı bölüm | seçilen renk önemi | renk isabeti (0 → seçilen) | tür isabeti (0 → seçilen) |
+|---|---|---|---|---|---|
+| Kadın | 12.852 | 0,944 → 1,000 | 0,2 | 0,360 → 0,446 | 0,764 → 0,706 |
+| Erkek | 17.492 | 0,964 → 1,000 | 0,3 | 0,461 → 0,597 | 0,922 → 0,892 |
+| Kız Çocuk | 807 | 0,855 → 1,000 | 0,2 | 0,460 → 0,565 | 0,764 → 0,733 |
+| Erkek Çocuk | 1.030 | 0,845 → 1,000 | 0,4 | 0,450 → 0,632 | 0,921 → 0,864 |
+| Aksesuar | 11.244 | 0,878 → 0,876 | 0,5 | 0,463 → 0,562 | 0,940 → 0,913 |
+
+Veri setinde adında "girl" geçen 185, "boy" geçen 210 ürün yetişkin olarak etiketlidir (ör. "Doodle Girl Little Princess Pink Tops" → Women); bunlar adlarına göre çocuk bölümüne alınır (`catalog.corrected_gender`). Benzerlik yüzdesi de bölüm içindeki tipik eşleşmelerle hesaplanır.
 
 Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan alınmıştır; ticari kullanımdan önce hak durumunu kontrol edin.
 

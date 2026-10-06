@@ -16,11 +16,12 @@ from fashion_rec.backbone import build_image_index, clip_encoder  # noqa: E402
 from fashion_rec.calibration import combined_scale, image_scale, text_scale  # noqa: E402
 from collections import Counter  # noqa: E402
 
-from fashion_rec.catalog import display_name, load_metadata, metadata_tags  # noqa: E402
+from fashion_rec.catalog import display_name, load_metadata, majority_segment, metadata_tags, segments  # noqa: E402
 from fashion_rec.color import build_color_index  # noqa: E402
 from fashion_rec.config import IMAGE_BACKBONE, IMAGE_EXTENSIONS  # noqa: E402
 from fashion_rec.data import catalog_index  # noqa: E402
 from fashion_rec.glossary import translate  # noqa: E402
+from fashion_rec.segment_settings import load_settings, setting  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
 from fashion_rec.recommend import recommend  # noqa: E402
 from fashion_rec.tags import TAG_GROUPS, build_tag_index, filter_results, tags_by_name  # noqa: E402
@@ -97,9 +98,11 @@ REFERENCE_MODIFIERS = ["kırmızı", "siyah", "beyaz", "mavi", "uzun kollu", "pa
 
 
 @st.cache_resource(show_spinner="Benzerlik ölçeği hazırlanıyor...")
-def get_image_scale(color_weight):
+def get_image_scale(color_weight, segment=None):
+    """Öneriler bir bölümle sınırlıysa ölçek de o bölümün tipik eşleşmelerinden hesaplanır."""
     color_features = get_color_features() if color_weight > 0 else None
-    return image_scale(paths, features, color_features=color_features, color_weight=color_weight)
+    subset = [p for p in paths if segment_lookup.get(p.name) == segment] if segment else None
+    return image_scale(paths, features, color_features=color_features, color_weight=color_weight, subset=subset)
 
 
 @st.cache_resource(show_spinner="Benzerlik ölçeği hazırlanıyor...")
@@ -109,10 +112,11 @@ def get_text_scale():
 
 
 @st.cache_resource(show_spinner="Benzerlik ölçeği hazırlanıyor...")
-def get_combined_scale(text_weight):
+def get_combined_scale(text_weight, segment=None):
     text_paths, text_features = get_text_index()
+    subset = [p for p in text_paths if segment_lookup.get(p.name) == segment] if segment else None
     return combined_scale(text_paths, text_features, get_clip_model(), REFERENCE_MODIFIERS,
-                          text_weight=text_weight, sample=10)
+                          text_weight=text_weight, sample=10, subset=subset)
 
 
 @st.cache_resource
@@ -154,8 +158,26 @@ def find_similar(image_path, modifier, top_n, text_weight, color_weight):
                            text_weight=text_weight, model=get_clip_model())
 
 
-def refine(results):
-    """Etiket filtrelerini uygular ve ilk `top_n` sonucu döndürür."""
+@st.cache_resource
+def get_segment_lookup():
+    """Dosya adı -> bölüm (Kadın / Erkek / Kız Çocuk / Erkek Çocuk / Aksesuar); metadata yoksa boş."""
+    metadata = get_metadata()
+    return dict(zip((p.name for p in paths), segments(paths, metadata))) if metadata else {}
+
+
+def query_segment(image_path):
+    """Sorgunun bölümü: katalogdaysa kendi etiketi, değilse en yakın 20 komşunun çoğunluğu."""
+    if not segment_lookup:
+        return None
+    if image_path.name in segment_lookup and image_path in catalog_index(paths)[1]:
+        return segment_lookup[image_path.name]
+    return majority_segment(find_similar(image_path, "", 20, 0.5, 0.0), segment_lookup)
+
+
+def refine(results, segment=None):
+    """Bölüm kısıtlamasını ve etiket filtrelerini uygular, ilk `top_n` sonucu döndürür."""
+    if segment and same_segment:
+        results = [(p, s) for p, s in results if segment_lookup.get(p.name) == segment]
     filtered = filter_results(results, tag_lookup, selected_tags)
     if results and not filtered:
         st.warning("Seçili filtrelere uyan sonuç yok.")
@@ -185,11 +207,17 @@ st.caption("Bir kıyafet seçin, yükleyin veya tarif edin; en çok benzeyen kı
 
 paths, features = get_index()
 tag_lookup, automatic_tags = get_tag_lookup()
+segment_lookup = get_segment_lookup()
+segment_settings = load_settings()
 
 with st.sidebar:
     st.header("Ayarlar")
     source = st.radio("Arama şekli", ["Veri setinden seç", "Görsel yükle", "Metinle ara"])
     top_n = st.slider("Öneri sayısı", min_value=1, max_value=12, value=GRID_COLUMNS)
+    same_segment = bool(segment_lookup) and st.toggle(
+        "Aynı bölümden öner", value=True,
+        help="Öneriler seçilen ürünün bölümünden (Kadın / Erkek / Kız Çocuk / Erkek Çocuk / Aksesuar) gelir. "
+             "Kapalıyken çocuk ürünlerine gelen önerilerin ~%25'i yetişkin ürünüdür.")
     st.subheader("Filtreler")
     selected_tags = {group: st.multiselect(group, labels, placeholder="Tümü")
                      for group, labels in get_filter_options().items()}
@@ -216,6 +244,15 @@ else:
     else:
         query_image = st.file_uploader("Görsel yükle", type=[ext.lstrip(".") for ext in IMAGE_EXTENSIONS])
 
+    segment = None
+    if query_image is not None:
+        if isinstance(query_image, Path):
+            segment = query_segment(query_image)
+        else:
+            with uploaded_file(query_image) as tmp_path:
+                segment = query_segment(tmp_path)
+    tuned_color = setting(segment, "color_weight", segment_settings)
+
     modifier_col, text_col, color_col = st.columns([3, 1, 1])
     with modifier_col:
         modifier = st.text_input("Değişiklik (isteğe bağlı): bunun gibi ama…",
@@ -224,9 +261,12 @@ else:
         text_weight = st.slider("Metin ağırlığı", 0.0, 1.0, 0.5, 0.1, disabled=not modifier,
                                 help="0 = yalnız görsel, 1 = yalnız metin")
     with color_col:
-        color_weight = st.slider("Renk önemi", 0.0, 1.0, 0.0, 0.1, disabled=bool(modifier),
+        # bölüm değişince kaydırıcı o bölüm için ölçülmüş değerle açılır (scripts/tune_segments.py)
+        color_weight = st.slider("Renk önemi", 0.0, 1.0, float(tuned_color), 0.1, disabled=bool(modifier),
+                                 key=f"color_weight_{segment}",
                                  help="Rengi benzer kıyafetleri öne çıkarır; değişiklik metni varken kullanılmaz. "
-                                      "Arttıkça stil/tür benzerliği azalır.")
+                                      "Arttıkça stil/tür benzerliği azalır."
+                                      + (f" {segment} bölümü için ölçülen en iyi değer: {tuned_color}." if segment else ""))
         if modifier:
             color_weight = 0.0
 
@@ -236,18 +276,22 @@ else:
     else:
         with st.spinner("Benzer kıyafetler aranıyor..."):
             if isinstance(query_image, Path):
-                results = refine(find_similar(query_image, modifier, len(paths), text_weight, color_weight))
+                results = refine(find_similar(query_image, modifier, len(paths), text_weight, color_weight), segment)
             else:
                 with uploaded_file(query_image) as tmp_path:
-                    results = refine(find_similar(tmp_path, modifier, len(paths), text_weight, color_weight))
+                    results = refine(find_similar(tmp_path, modifier, len(paths), text_weight, color_weight), segment)
 
         left, right = st.columns([1, 3], gap="large")
         with left:
             st.subheader("Seçilen")
             st.image(query_image if not isinstance(query_image, Path) else str(query_image), width="stretch")
+            if segment:
+                st.caption(f"Bölüm: **{segment}**" + ("" if isinstance(query_image, Path) else " (tahmin)"))
         with right:
             st.subheader(f"Öneriler: bunun gibi ama “{modifier}”" if modifier else "Öneriler")
             if modifier and translate(modifier):
                 st.caption(f"Sözlükle aranan: *{translate(modifier)}*")
-            scale = get_combined_scale(text_weight) if modifier else get_image_scale(color_weight)
+            scale_segment = segment if same_segment else None
+            scale = (get_combined_scale(text_weight, scale_segment) if modifier
+                     else get_image_scale(color_weight, scale_segment))
             show_grid(results, scale)

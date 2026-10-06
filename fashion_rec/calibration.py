@@ -48,11 +48,22 @@ def _scores(results_lists, top_k: int = TOP_K) -> list[float]:
 
 
 def image_scale(paths: list[Path], features: np.ndarray, color_features: np.ndarray | None = None,
-                color_weight: float = 0.0, sample: int = 100) -> PercentScale:
-    """Görselden öneri için referans: örnek katalog görsellerinin en iyi eşleşmelerinin skorları."""
+                color_weight: float = 0.0, sample: int = 100, subset: list[Path] | None = None) -> PercentScale:
+    """Görselden öneri için referans: örnek katalog görsellerinin en iyi eşleşmelerinin skorları.
+
+    `subset` verilirse (ör. bir bölümün ürünleri) sorgular oradan seçilir ve
+    sonuçlar oraya sınırlanır; öneriler bölümle sınırlıyken yüzde de o
+    bölümün tipik eşleşmeleriyle kıyaslanır.
+    """
+    if subset is None:
+        return PercentScale(_scores(
+            recommend(q, paths, features, top_n=TOP_K, color_features=color_features, color_weight=color_weight)
+            for q in sample_paths(paths, sample)))
+    allowed = set(subset)
     return PercentScale(_scores(
-        recommend(q, paths, features, top_n=TOP_K, color_features=color_features, color_weight=color_weight)
-        for q in sample_paths(paths, sample)))
+        [r for r in recommend(q, paths, features, top_n=len(paths), color_features=color_features,
+                              color_weight=color_weight) if r[0] in allowed]
+        for q in sample_paths(list(subset), sample)))
 
 
 def text_scale(paths: list[Path], clip_features: np.ndarray, model, queries: list[str]) -> PercentScale:
@@ -61,8 +72,14 @@ def text_scale(paths: list[Path], clip_features: np.ndarray, model, queries: lis
 
 
 def combined_scale(paths: list[Path], clip_features: np.ndarray, model, queries: list[str],
-                   text_weight: float = 0.5, sample: int = 20) -> PercentScale:
-    """Görsel + metin araması için referans: örnek görsel × genel tarif çiftlerinin en iyi eşleşmeleri."""
+                   text_weight: float = 0.5, sample: int = 20, subset: list[Path] | None = None) -> PercentScale:
+    """Görsel + metin araması için referans: örnek görsel × genel tarif çiftlerinin en iyi eşleşmeleri.
+
+    `subset` için bkz. `image_scale`.
+    """
+    allowed = set(subset) if subset is not None else None
+    pool = list(subset) if subset is not None else paths
     return PercentScale(_scores(
-        combined_search(image, q, paths, clip_features, top_n=TOP_K, text_weight=text_weight, model=model)
-        for image in sample_paths(paths, sample) for q in queries))
+        [r for r in combined_search(image, q, paths, clip_features, top_n=len(paths) if allowed else TOP_K,
+                                    text_weight=text_weight, model=model) if allowed is None or r[0] in allowed]
+        for image in sample_paths(pool, sample) for q in queries))

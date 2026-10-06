@@ -61,3 +61,11 @@ def test_text_scale_and_combined_scale(data_dir, tmp_path, clip_model):
     assert scale(good) > scale(bad)
     comb = combined_scale(paths, feats, clip_model, queries, sample=2)
     assert 0 <= comb(0.0) <= 100
+
+
+def test_image_scale_with_subset_uses_only_subset(data_dir, index):
+    paths, feats = index
+    subset = [p for p in paths if p.name in {"red.jpg", "orange.png", "green.jpg"}]
+    scale = image_scale(paths, feats, subset=subset)
+    # referans yalnız alt kümedeki çiftlerden: 3 sorgu × 2 eşleşme
+    assert len(scale.reference) == 6
