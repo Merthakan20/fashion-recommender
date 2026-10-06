@@ -197,16 +197,17 @@ Ayarlar (veri klasörü, önbellek yolları, görsel boyutu, batch boyutu, CLIP 
 
 ## Veri setleri
 
-Veri seti `FASHION_DATASET` ortam değişkeniyle seçilir; önbellekler `cache/<veri seti>/` altında ayrı tutulur.
+Veri seti `FASHION_DATASET` ortam değişkeniyle seçilir; belirtilmezse `products` indirilmişse o, değilse `women` kullanılır. Önbellekler `cache/<veri seti>/` altında ayrı tutulur.
 
 | ad | içerik | görsel öneri modeli |
 |---|---|---|
-| `women` (varsayılan) | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
-| `products` | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
+| `women` | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
+| `products` (indirilmişse varsayılan) | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
 
 ```bash
-FASHION_DATASET=products streamlit run app.py
-FASHION_DATASET=products python -m fashion_rec search "kız çocuk elbisesi"
+streamlit run app.py                                   # products indirilmişse onu açar
+FASHION_DATASET=women streamlit run app.py             # 93 görsellik kadın veri seti
+python -m fashion_rec search "kız çocuk elbisesi"
 ```
 
 **`products` kurulumu** (~4 GB disk): `scripts/import_products.py` dosyasının başındaki komutla Hugging Face'teki 384×512 kopyayı (`benitomartin/fashion-product-images-small-384x512`, 5 parquet dosyası, 2 GB) `data/products/raw/` altına indirin, sonra:

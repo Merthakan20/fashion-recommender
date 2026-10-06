@@ -5,6 +5,10 @@ TensorFlow yüklemeden saniyeler içinde çalışır.
 """
 
 import importlib
+import os
+
+# testler gerçek veri setine dokunmaz; yapılandırma ortamdan (indirilmiş 44 bin ürün) bağımsız olsun
+os.environ["FASHION_DATASET"] = "women"
 
 import numpy as np
 import pytest

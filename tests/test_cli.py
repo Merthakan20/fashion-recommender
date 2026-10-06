@@ -70,11 +70,20 @@ def test_empty_search_exits_with_error(fake_text_index):
     assert "boş" in str(exc.value)
 
 
-def test_index_text_builds_both_indexes(fake_index, fake_text_index, capsys):
+def test_index_text_builds_both_indexes(fake_index, fake_text_index, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "IMAGE_BACKBONE", "vgg16")
     cli.main(["index", "--text"])
     out = capsys.readouterr().out
-    assert "5 görsel indekslendi" in out
+    assert "5 görsel indekslendi (vgg16)" in out
     assert "metin araması için indekslendi" in out
+
+
+def test_index_with_clip_backbone_builds_single_index(fake_index, fake_text_index, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "IMAGE_BACKBONE", "clip")
+    cli.main(["index", "--text"])
+    out = capsys.readouterr().out
+    assert "(clip)" in out
+    assert "metin araması için indekslendi" not in out  # CLIP'te görsel ve metin indeksi aynı
 
 
 def test_combine_prints_ranked_results(data_dir, fake_text_index, capsys):

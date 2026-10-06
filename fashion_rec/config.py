@@ -5,12 +5,13 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Veri seti FASHION_DATASET ortam değişkeniyle seçilir, ör. `FASHION_DATASET=products streamlit run app.py`
+# Veri seti FASHION_DATASET ortam değişkeniyle seçilir, ör. `FASHION_DATASET=women streamlit run app.py`
 DATASETS = {
     "women": PROJECT_ROOT / "data" / "women fashion",       # 93 kadın kıyafeti (git'te)
     "products": PROJECT_ROOT / "data" / "products" / "images",  # Fashion Product Images, 44 bin ürün (git dışında)
 }
-DATASET = os.environ.get("FASHION_DATASET", "women")
+# varsayılan: 44 bin ürünlük veri seti indirilmişse o, değilse git'teki kadın veri seti
+DATASET = os.environ.get("FASHION_DATASET") or ("products" if (DATASETS["products"] / "metadata.csv").exists() else "women")
 if DATASET not in DATASETS:
     raise ValueError(f"Bilinmeyen FASHION_DATASET: {DATASET!r} (seçenekler: {', '.join(DATASETS)})")
 DATA_DIR = DATASETS[DATASET]
