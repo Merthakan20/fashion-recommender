@@ -18,10 +18,11 @@ from collections import Counter  # noqa: E402
 
 from fashion_rec.catalog import display_name, load_metadata, majority_segment, metadata_tags, segments  # noqa: E402
 from fashion_rec.color import build_color_index  # noqa: E402
-from fashion_rec.config import IMAGE_BACKBONE, IMAGE_EXTENSIONS  # noqa: E402
+from fashion_rec.config import IMAGE_BACKBONE, IMAGE_EXTENSIONS, ROLE_CACHE_PATH  # noqa: E402
 from fashion_rec.data import catalog_index  # noqa: E402
 from fashion_rec.diversity import mmr  # noqa: E402
 from fashion_rec.glossary import translate  # noqa: E402
+from fashion_rec.outfit import OutfitCatalog, clip_roles, infer_row  # noqa: E402
 from fashion_rec.segment_settings import load_settings, setting  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
 from fashion_rec.recommend import recommend  # noqa: E402
@@ -175,6 +176,44 @@ def query_segment(image_path):
     return majority_segment(find_similar(image_path, "", 20, 0.5, 0.0), segment_lookup)
 
 
+@st.cache_resource(show_spinner="Kombin kataloğu hazırlanıyor...")
+def get_outfit_catalog():
+    """Kombin önerisi CLIP vektörleriyle çalışır; metadata'sı olmayan veri setinde None."""
+    if not get_metadata():
+        return None
+    clip_paths, clip_features = (paths, features) if IMAGE_BACKBONE == "clip" else get_text_index()
+    roles = clip_roles(clip_paths, clip_features, ROLE_CACHE_PATH)
+    return OutfitCatalog(clip_paths, clip_features, get_metadata(), visual_roles=roles)
+
+
+SLOT_TITLES = {"üst": "Üst", "alt": "Alt", "ayakkabı": "Ayakkabı", "aksesuar": "Aksesuar"}
+
+
+def show_outfit(image_path, uploaded):
+    """Seçilen ürünü tamamlayan parçalar: yuva başına 3 öneri."""
+    catalog = get_outfit_catalog()
+    if uploaded:  # katalog dışı görsel: etiketler en yakın komşulardan, vektör CLIP ile
+        row = infer_row(find_similar(image_path, "", 20, 0.5, 0.0), get_metadata())
+        vector = clip_encoder(get_clip_model())([image_path])[0]
+    else:
+        row = get_metadata().get(image_path.name, {})
+        vector = query_vector(image_path, catalog.paths, catalog.features)
+    outfit = catalog.suggest(row, vector, per_slot=3, exclude=None if uploaded else image_path)
+    if not outfit:
+        st.info("Bu ürün türü için kombin önerisi yok (kombin üst, alt, tek parça, ayakkabı ve aksesuarlar için).")
+        return
+    st.caption("Aynı cinsiyet ve uyumlu kullanımdan (resmi, günlük, spor, etnik) parçalar; stil benzerliği, "
+               "renk uyumu ve mevsime göre sıralı. Veri setinde kombin bilgisi olmadığından kurallara dayalı bir "
+               "öneridir; desen uyumuna bakmaz." + (" Ürün türü komşulardan tahmin edildi." if uploaded else ""))
+    for slot, items in outfit.items():
+        st.markdown(f"**{SLOT_TITLES.get(slot, slot)}**")
+        for col, (path, _) in zip(st.columns(GRID_COLUMNS), items):
+            with col:
+                st.image(str(path), width="stretch")
+                st.markdown(label(path))
+                st.caption(" · ".join(tag_lookup[path.name].values()))
+
+
 def query_vector(image_path, index_paths, index_features):
     """Katalogdaki sorgunun vektörü (çeşitlilikte "aynı ürün" tespiti için); yüklenen görselde None."""
     row = catalog_index(index_paths)[1].get(image_path)
@@ -309,10 +348,20 @@ else:
             if segment:
                 st.caption(f"Bölüm: **{segment}**" + ("" if isinstance(query_image, Path) else " (tahmin)"))
         with right:
-            st.subheader(f"Öneriler: bunun gibi ama “{modifier}”" if modifier else "Öneriler")
-            if modifier and translate(modifier):
-                st.caption(f"Sözlükle aranan: *{translate(modifier)}*")
-            scale_segment = segment if same_segment else None
-            scale = (get_combined_scale(text_weight, scale_segment) if modifier
-                     else get_image_scale(color_weight, scale_segment))
-            show_grid(results, scale)
+            similar_tab, outfit_tab = (st.tabs(["Benzer ürünler", "Kombin önerisi"]) if get_outfit_catalog()
+                                       else (st.container(), None))
+            with similar_tab:
+                st.subheader(f"Öneriler: bunun gibi ama “{modifier}”" if modifier else "Öneriler")
+                if modifier and translate(modifier):
+                    st.caption(f"Sözlükle aranan: *{translate(modifier)}*")
+                scale_segment = segment if same_segment else None
+                scale = (get_combined_scale(text_weight, scale_segment) if modifier
+                         else get_image_scale(color_weight, scale_segment))
+                show_grid(results, scale)
+            if outfit_tab is not None:
+                with outfit_tab:
+                    if isinstance(query_image, Path):
+                        show_outfit(query_image, uploaded=False)
+                    else:
+                        with uploaded_file(query_image) as tmp_path:
+                            show_outfit(tmp_path, uploaded=True)

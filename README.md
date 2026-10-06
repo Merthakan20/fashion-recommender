@@ -184,6 +184,7 @@ fashion-recommender/
 │   ├── adapter.py        # CLIP üzerine eğitilmiş doğrusal adaptör (isteğe bağlı)
 │   ├── glossary.py       # Türkçe moda terimleri sözlüğü (sorgu çevirisi)
 │   ├── diversity.py      # çeşitlilik (MMR yeniden sıralama)
+│   ├── outfit.py         # kombin önerisi
 │   ├── segment_settings.py   # bölüm bazında ayarlar
 │   └── segment_settings.json # scripts/tune_segments.py çıktısı
 ├── app.py                # Streamlit arayüzü
@@ -242,6 +243,15 @@ Veri setinde adında "girl" geçen 185, "boy" geçen 210 ürün yetişkin olarak
 | **0,2** | 0,866 | 0,826 | %9 |
 | 0,4 | 0,838 | 0,788 | %8 |
 | 0,6 | 0,772 | 0,728 | %0 |
+
+**Kombin önerisi** (görsel modlarında "Kombin önerisi" sekmesi, `fashion_rec/outfit.py`): seçilen ürünü tamamlayan parçalar (gömleğe alt + ayakkabı + aksesuar, elbiseye ayakkabı + aksesuar…). Veri setinde "birlikte giyilir" bilgisi olmadığından kurallara dayalıdır:
+- rol alt kategoriden çıkar (üst / alt / tek parça / ayakkabı / aksesuar), yuvalar role göre seçilir,
+- adaylar aynı cinsiyetten (veya unisex) ve uyumlu kullanımdandır (resmi ↔ resmi / yarı resmi, spor ↔ spor / günlük, etnik ↔ etnik / günlük),
+- sıralama: CLIP stil benzerliği + kullanım birebir eşleşmesi + renk uyumu (nötr renkler ve kot her şeyle uyar, iki farklı canlı renk cezalı) + mevsim,
+- etiket hatalarına karşı iki kontrol: adı başka rolü söyleyen ürünler ("… White Shirts" adlı terlik) ve görseli yuvanın rolüne benzemeyen ürünler (CLIP; "… Wallet" görselinde gömlek) aday olmaz; neredeyse aynı görseller bir yuvada tekrarlanmaz,
+- yüklenen görselde ürün türü, cinsiyet ve kullanım en yakın 20 komşudan tahmin edilir.
+
+Vekil ölçütler (`notebooks/outfit_examples.py`, 500 sorgu; sezgisel bu kuralları kullandığı için yalnızca kuralların işlediğini gösterir): kullanım birebir 0,84 (rastgele) / 0,89 (yalnız CLIP) / **0,97**; renk uyumu 0,88 / 0,81 / **0,98**. Asıl değerlendirme gözle: `notebooks/outfit_examples/examples.png`. Sınırlama: desen uyumuna bakmaz (ekose gömleğe ekose şort önerebilir).
 
 Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan alınmıştır; ticari kullanımdan önce hak durumunu kontrol edin.
 

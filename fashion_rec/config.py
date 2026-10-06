@@ -43,3 +43,6 @@ COLOR_CROP = (0.25, 0.15, 0.75, 0.85)  # kıyafetin çoğunlukla durduğu orta b
 
 # Otomatik etiketler (CLIP, sıfır örnekli); karşılaştırma: notebooks/compare_tags.py
 TAG_CACHE_PATH = CACHE_DIR / "tags.npz"
+
+# Kombin önerisi: görsellerin CLIP rol tahmini (fashion_rec/outfit.py)
+ROLE_CACHE_PATH = CACHE_DIR / "visual_roles.npz"

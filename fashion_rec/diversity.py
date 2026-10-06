@@ -29,15 +29,17 @@ NEAR_DUPLICATE = 0.97  # bu benzerliğin üstü "aynı ürün" sayılır
 
 def mmr(results: list[tuple[Path, float]], paths: list[Path], features: np.ndarray, top_n: int,
         diversity: float = 0.0, query_vector: np.ndarray | None = None,
-        pool: int = 100) -> list[tuple[Path, float]]:
+        pool: int = 100, drop_near_duplicates: bool = False) -> list[tuple[Path, float]]:
     """`results` (azalan skorlu) içinden ilk `pool` adayı MMR ile yeniden sıralayıp `top_n` döndürür.
 
-    Skorlar değişmez, yalnızca sıra değişir. `diversity` 0 ise ilk `top_n`
-    olduğu gibi döner.
+    Skorlar değişmez, yalnızca sıra değişir. `diversity` 0 ise (ve kopya
+    eleme kapalıysa) ilk `top_n` olduğu gibi döner. `drop_near_duplicates`
+    seçilmiş bir öneriyle neredeyse aynı (> NEAR_DUPLICATE) adayları tamamen
+    eler (ör. aynı ürünün iki ilanı kombin yuvasında iki kez çıkmasın).
     """
     if not 0 <= diversity <= 1:
         raise ValueError("diversity 0 ile 1 arasında olmalı")
-    if diversity == 0 or len(results) <= 1:
+    if (diversity == 0 and not drop_near_duplicates) or len(results) <= 1:
         return results[:top_n]
 
     candidates = results[:max(pool, top_n)]
@@ -62,7 +64,12 @@ def mmr(results: list[tuple[Path, float]], paths: list[Path], features: np.ndarr
     while len(chosen) < min(top_n, len(candidates)):
         value = np.where(available, (1 - diversity) * relevance - diversity * redundancy, -np.inf)
         best = int(np.argmax(value))
+        if value[best] == -np.inf:  # kalan adayların hepsi elendi
+            break
         chosen.append(best)
         available[best] = False
-        redundancy = np.maximum(redundancy, vectors @ vectors[best])
+        to_best = vectors @ vectors[best]
+        if drop_near_duplicates:
+            available &= to_best <= NEAR_DUPLICATE
+        redundancy = np.maximum(redundancy, to_best)
     return [candidates[i] for i in chosen]

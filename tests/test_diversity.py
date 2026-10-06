@@ -52,3 +52,11 @@ def test_invalid_diversity(catalog):
     paths, feats = catalog
     with pytest.raises(ValueError):
         mmr(ranked(paths, feats, np.array([1.0, 0, 0])), paths, feats, 2, diversity=1.5)
+
+
+def test_drop_near_duplicates_removes_copies_even_without_diversity(catalog):
+    paths, feats = catalog
+    results = ranked(paths, feats, np.array([0.95, 0.31, 0.0]))
+    kept = names(mmr(results, paths, feats, 3, diversity=0, drop_near_duplicates=True))
+    assert len({"a", "a_copy"} & set(kept)) == 1  # iki kopyadan yalnız biri
+    assert "b" in kept
