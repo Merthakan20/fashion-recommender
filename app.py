@@ -20,6 +20,7 @@ from fashion_rec.catalog import display_name, load_metadata, majority_segment, m
 from fashion_rec.color import build_color_index  # noqa: E402
 from fashion_rec.config import IMAGE_BACKBONE, IMAGE_EXTENSIONS  # noqa: E402
 from fashion_rec.data import catalog_index  # noqa: E402
+from fashion_rec.diversity import mmr  # noqa: E402
 from fashion_rec.glossary import translate  # noqa: E402
 from fashion_rec.segment_settings import load_settings, setting  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
@@ -174,14 +175,24 @@ def query_segment(image_path):
     return majority_segment(find_similar(image_path, "", 20, 0.5, 0.0), segment_lookup)
 
 
-def refine(results, segment=None):
-    """Bölüm kısıtlamasını ve etiket filtrelerini uygular, ilk `top_n` sonucu döndürür."""
+def query_vector(image_path, index_paths, index_features):
+    """Katalogdaki sorgunun vektörü (çeşitlilikte "aynı ürün" tespiti için); yüklenen görselde None."""
+    row = catalog_index(index_paths)[1].get(image_path)
+    return index_features[row] if row is not None else None
+
+
+def refine(results, segment=None, index=None, query_vec=None):
+    """Bölüm kısıtlaması + etiket filtreleri, sonra çeşitlilik (MMR) ile ilk `top_n` sonuç.
+
+    `index` = sonuçların geldiği (yollar, vektörler); çeşitlilik bu vektörlerle ölçülür.
+    """
     if segment and same_segment:
         results = [(p, s) for p, s in results if segment_lookup.get(p.name) == segment]
     filtered = filter_results(results, tag_lookup, selected_tags)
     if results and not filtered:
         st.warning("Seçili filtrelere uyan sonuç yok.")
-    return filtered[:top_n]
+    index_paths, index_features = index or (paths, features)
+    return mmr(filtered, index_paths, index_features, top_n, diversity=diversity, query_vector=query_vec)
 
 
 def percent_text(pct):
@@ -218,6 +229,11 @@ with st.sidebar:
         "Aynı bölümden öner", value=True,
         help="Öneriler seçilen ürünün bölümünden (Kadın / Erkek / Kız Çocuk / Erkek Çocuk / Aksesuar) gelir. "
              "Kapalıyken çocuk ürünlerine gelen önerilerin ~%25'i yetişkin ürünüdür.")
+    diversity = st.slider(
+        "Çeşitlilik", 0.0, 0.6, 0.2, 0.1,
+        help="Neredeyse aynı ürünlerin (aynı ürünün başka ilanı, aynı modelin renkleri) önerileri doldurmasını "
+             "önler. 0,2'de ürün türü isabeti ~1 puan düşerken kopya içeren sorgular %14'ten %9'a iner; "
+             "0,4'ün üstünde öneri kalitesi hızla düşer.")
     st.subheader("Filtreler")
     selected_tags = {group: st.multiselect(group, labels, placeholder="Tümü")
                      for group, labels in get_filter_options().items()}
@@ -236,7 +252,8 @@ if source == "Metinle ara":
         if translate(query):
             st.caption(f"Sözlükle aranan: *{translate(query)}*")
         st.subheader("Sonuçlar")
-        show_grid(refine(search(query, text_paths, text_features, top_n=len(paths), model=get_clip_model())),
+        show_grid(refine(search(query, text_paths, text_features, top_n=len(paths), model=get_clip_model()),
+                         index=(text_paths, text_features)),
                   get_text_scale())
 else:
     if source == "Veri setinden seç":
@@ -274,12 +291,16 @@ else:
         if source == "Görsel yükle":
             st.info("Başlamak için bir kıyafet görseli yükleyin.")
     else:
+        # görsel + metin araması CLIP indeksinden, görselden öneri görsel modelinin indeksinden gelir
+        index = get_text_index() if modifier else (paths, features)
         with st.spinner("Benzer kıyafetler aranıyor..."):
             if isinstance(query_image, Path):
-                results = refine(find_similar(query_image, modifier, len(paths), text_weight, color_weight), segment)
+                results = refine(find_similar(query_image, modifier, len(paths), text_weight, color_weight), segment,
+                                 index, query_vector(query_image, *index))
             else:
                 with uploaded_file(query_image) as tmp_path:
-                    results = refine(find_similar(tmp_path, modifier, len(paths), text_weight, color_weight), segment)
+                    results = refine(find_similar(tmp_path, modifier, len(paths), text_weight, color_weight),
+                                     segment, index)
 
         left, right = st.columns([1, 3], gap="large")
         with left:

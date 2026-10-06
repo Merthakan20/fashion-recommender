@@ -183,6 +183,7 @@ fashion-recommender/
 │   ├── backbone.py       # görsel öneri modeli seçimi (VGG16 / CLIP)
 │   ├── adapter.py        # CLIP üzerine eğitilmiş doğrusal adaptör (isteğe bağlı)
 │   ├── glossary.py       # Türkçe moda terimleri sözlüğü (sorgu çevirisi)
+│   ├── diversity.py      # çeşitlilik (MMR yeniden sıralama)
 │   ├── segment_settings.py   # bölüm bazında ayarlar
 │   └── segment_settings.json # scripts/tune_segments.py çıktısı
 ├── app.py                # Streamlit arayüzü
@@ -232,6 +233,15 @@ Bu veri setinde arayüzdeki filtreler CLIP tahminleri yerine ürünlerin kendi e
 | Aksesuar | 11.244 | 0,878 → 0,876 | 0,5 | 0,463 → 0,562 | 0,940 → 0,913 |
 
 Veri setinde adında "girl" geçen 185, "boy" geçen 210 ürün yetişkin olarak etiketlidir (ör. "Doodle Girl Little Princess Pink Tops" → Women); bunlar adlarına göre çocuk bölümüne alınır (`catalog.corrected_gender`). Benzerlik yüzdesi de bölüm içindeki tipik eşleşmelerle hesaplanır.
+
+**Çeşitlilik** (kenar çubuğu, varsayılan 0,2): neredeyse aynı ürünlerin (aynı ürünün başka ilanı, aynı modelin renkleri) önerileri doldurmasını önler. Bölüm içi ilk 5 öneride sorguların %28'inde aynı adlı ürün tekrarı vardı; ama aynı adlı ürünlerin çoğu farklıdır (görsel benzerlik medyanı 0,85, yalnız %6'sı neredeyse aynı fotoğraf), bu yüzden ada göre eleme yerine görsel MMR yeniden sıralaması kullanılır (`fashion_rec/diversity.py`): aday, sorguya benzerliğiyle puan kazanır, seçilmiş önerilere benzerliğiyle (ve sorgunun neredeyse kopyasıysa) puan kaybeder. `notebooks/compare_diversity.py` (1.000 sorgu):
+
+| çeşitlilik | tür isabeti | öneriler arası benzerlik | neredeyse kopya içeren sorgu |
+|---|---|---|---|
+| 0 | 0,876 | 0,844 | %14 |
+| **0,2** | 0,866 | 0,826 | %9 |
+| 0,4 | 0,838 | 0,788 | %8 |
+| 0,6 | 0,772 | 0,728 | %0 |
 
 Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan alınmıştır; ticari kullanımdan önce hak durumunu kontrol edin.
 
