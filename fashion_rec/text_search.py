@@ -8,6 +8,7 @@ from .adapter import current_adapter
 from .config import BATCH_SIZE, CLIP_CACHE_PATH, CLIP_MODEL, CLIP_PRETRAINED, DATA_DIR
 from .data import catalog_index, list_images
 from .features import cached_features, report_progress
+from .glossary import translate
 from .recommend import zscore
 
 
@@ -78,10 +79,20 @@ def build_text_index(data_dir: Path = DATA_DIR, cache_path: Path = CLIP_CACHE_PA
                                   force, key=clip_key())
 
 
+def encode_query(model, text: str) -> np.ndarray:
+    """Sorgunun L2 normalize vektörü; Türkçe moda terimleri önce sözlükle İngilizceye çevrilir.
+
+    Çok dilli CLIP bazı Türkçe kelimeleri tanımıyor ("kemer" → "belt"); çeviri
+    ayrık bir Türkçe sorgu setinde ilk 10 isabeti 0,68'den 0,83'e çıkardı
+    (notebooks/compare_glossary.py).
+    """
+    return normalize(model.encode_text([translate(text) or text]))[0]
+
+
 def search(query: str, paths: list[Path], features: np.ndarray,
            top_n: int = 5, model=None) -> list[tuple[Path, float]]:
     """Metne en çok uyan `top_n` görseli (yol, skor) olarak, azalan skorla döndürür."""
-    text = normalize((model or load_clip_model()).encode_text([query]))[0]
+    text = encode_query(model or load_clip_model(), query)
     similarities = features @ text
     ranked = np.argsort(similarities)[::-1][:top_n]
     return [(paths[i], float(similarities[i])) for i in ranked]
@@ -105,7 +116,7 @@ def combined_search(image_path: Path, text: str, paths: list[Path], features: np
         image = features[query_index]
     else:
         image = normalize(model.encode_images([image_path]))[0]
-    text_vec = normalize(model.encode_text([text]))[0]
+    text_vec = encode_query(model, text)
 
     scores = (1 - text_weight) * zscore(features @ image) + text_weight * zscore(features @ text_vec)
     ranked = np.argsort(scores)[::-1]

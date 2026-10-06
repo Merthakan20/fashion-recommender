@@ -20,6 +20,7 @@ from fashion_rec.catalog import display_name, load_metadata, metadata_tags  # no
 from fashion_rec.color import build_color_index  # noqa: E402
 from fashion_rec.config import IMAGE_BACKBONE, IMAGE_EXTENSIONS  # noqa: E402
 from fashion_rec.data import catalog_index  # noqa: E402
+from fashion_rec.glossary import translate  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
 from fashion_rec.recommend import recommend  # noqa: E402
 from fashion_rec.tags import TAG_GROUPS, build_tag_index, filter_results, tags_by_name  # noqa: E402
@@ -204,6 +205,8 @@ if source == "Metinle ara":
         st.info("Başlamak için bir tarif yazın, ör. *siyah dantel elbise* veya *white trousers*.")
     else:
         text_paths, text_features = get_text_index()
+        if translate(query):
+            st.caption(f"Sözlükle aranan: *{translate(query)}*")
         st.subheader("Sonuçlar")
         show_grid(refine(search(query, text_paths, text_features, top_n=len(paths), model=get_clip_model())),
                   get_text_scale())
@@ -244,5 +247,7 @@ else:
             st.image(query_image if not isinstance(query_image, Path) else str(query_image), width="stretch")
         with right:
             st.subheader(f"Öneriler: bunun gibi ama “{modifier}”" if modifier else "Öneriler")
+            if modifier and translate(modifier):
+                st.caption(f"Sözlükle aranan: *{translate(modifier)}*")
             scale = get_combined_scale(text_weight) if modifier else get_image_scale(color_weight)
             show_grid(results, scale)

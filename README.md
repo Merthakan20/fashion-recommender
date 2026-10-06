@@ -181,7 +181,8 @@ fashion-recommender/
 │   ├── calibration.py    # ham skorları benzerlik yüzdesine çevirme
 │   ├── catalog.py        # ürün adları ve veri setinin kendi etiketleri (metadata.csv)
 │   ├── backbone.py       # görsel öneri modeli seçimi (VGG16 / CLIP)
-│   └── adapter.py        # CLIP üzerine eğitilmiş doğrusal adaptör (isteğe bağlı)
+│   ├── adapter.py        # CLIP üzerine eğitilmiş doğrusal adaptör (isteğe bağlı)
+│   └── glossary.py       # Türkçe moda terimleri sözlüğü (sorgu çevirisi)
 ├── app.py                # Streamlit arayüzü
 ├── scripts/              # veri seti içe aktarma
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
@@ -229,5 +230,14 @@ Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan al�
 | CLIP + renk 0,3 | 0,762 | 0,440 | 0,858 | 0,988 |
 
 Metinden aramada 20 Türkçe/İngilizce sorgunun ilk 10 sonucunda ortalama isabet 0,79; zayıf olanlar "kemer" (0), "yeşil kurta" (0,2), "kırmızı elbise" (0,3). Zayıflığın kaynağı çoğunlukla Türkçe kelime dağarcığıdır: "kemer" 0 iken "belt" 1,0; "terlik" 0,3 iken "flip flops" 1,0.
+
+**Türkçe moda sözlüğü** (`fashion_rec/glossary.py`): ~200 terim (giyim, ayakkabı, aksesuar, kozmetik, renk, desen, cinsiyet). Sorgudaki bilinen terimler İngilizceye çevrilir ve arama bu çeviriyle yapılır; ekli haller kökten tanınır ("gömleği", "çantası"), çok kelimeli ifadeler önce denenir ("kol saati", "kız çocuk"), sözlükte olmayan kelimeler (marka adları) olduğu gibi kalır. Arayüz çeviriyi "Sözlükle aranan: belt" diye gösterir. Etki (`notebooks/compare_glossary.py`, tüm katalogda ilk 10 isabet):
+
+| sorgu seti | sözlüksüz | sözlükle |
+|---|---|---|
+| geliştirme (19 Türkçe sorgu; sözlük yazılırken görüldü) | 0,805 | 0,884 |
+| **ayrık** (30 Türkçe sorgu; sözlükten önce hazırlandı, ayarlamada kullanılmadı) | 0,680 | **0,830** |
+
+En büyük kazançlar: "erkek kemer" 0 → 1,0, "sütyen" 0,1 → 0,9, "kazak" 0 → 0,9, "terlik" 0,3 → 1,0. Gerileyenler de var: "topuklu ayakkabı" 1,0 → 0,7, "erkek şort" 1,0 → 0,7, "mor elbise" 0,5 → 0,3.
 
 **Model eğitimi denemesi** (`scripts/train_adapter.py`): CLIP dondurulup üzerine doğrusal bir adaptör, görselleri ürün adlarıyla / etiket şablonlarıyla ("Women Silver Watches") eşleştirecek şekilde eğitildi; ürünlerin %20'si testte hiç görülmedi. En iyi ayar (şablon, λ=0,1) testte etiket sorgularını 0,754 → 0,768, Türkçe sorguları 0,742 → 0,753, görsel renk eşleşmesini 0,355 → 0,379 iyileştirdi; ama doğrulamada Türkçe sorgular 0,774 → 0,753 geriledi. Kazanç küçük ve gürültü payı içinde olduğu için adaptör **kullanılmıyor**; altyapı (`fashion_rec/adapter.py`) yerinde, `cache/<veri seti>/clip_adapter.npz` varsa otomatik devreye girer.

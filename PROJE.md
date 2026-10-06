@@ -37,7 +37,8 @@ fashion-recommender/
 │   ├── calibration.py        # benzerlik yüzdesi
 │   ├── catalog.py            # ürün adları + metadata etiketleri
 │   ├── backbone.py           # görsel öneri modeli seçimi
-│   └── adapter.py            # CLIP adaptörü (isteğe bağlı)
+│   ├── adapter.py            # CLIP adaptörü (isteğe bağlı)
+│   └── glossary.py           # Türkçe moda sözlüğü
 ├── app.py                    # Streamlit arayüzü
 ├── notebooks/                # deneme / görselleştirme notebook'ları
 ├── data/
@@ -189,3 +190,11 @@ fashion-recommender/
 
   Testte seçilen ayar: etiket 0,754 → 0,768, Türkçe 0,742 → 0,753, görsel renk 0,355 → 0,379, görsel tür 0,821 → 0,816. Ürün adlarıyla eğitim zarar verdi (marka/model kelimelerine uyum). **Karar: adaptör kullanılmıyor** — kazanç 1–2 puan, küçük sorgu setlerinin gürültü payı içinde ve doğrulamada Türkçeyi geriletiyor. Altyapı yerinde: adaptör dosyası varsa `ClipModel` otomatik uygular ve önbellek anahtarı adaptör imzasını içerir (4 test).
   Değerlendirme setinde hata bulundu ve düzeltildi: "parfüm" beklenen etiketi "Perfume and body mist" yazılmıştı (doğrusu "Body Mist"); "parfüm" aslında 1,0, metin araması ortalaması 0,74 değil **0,79**. **Asıl Türkçe darboğazı kelime dağarcığı**: "kemer" 0 / "belt" 1,0, "terlik" 0,3 / "flip flops" 1,0, "yeşil kurta" 0,3 / "green kurta" 0,6. Sıradaki adım önerisi: Türkçe moda terimleri sözlüğüyle sorguyu İngilizceye genişletme (eğitim gerektirmez).
+- **2026-10-05** — Adaptör denemesi commit edildi (`ba6482b`). **Türkçe moda sözlüğü** eklendi (`fashion_rec/glossary.py`, ~200 terim): kök eşleme (ekli haller), önce çok kelimeli ifadeler, kısa kökler (≤3 harf) en fazla 3 harf ek alır ("bot" ≠ "botanik"), Türkçe büyük/küçük harf (I → ı, İ → i), boş karşılık kelimeyi atar ("rengi"). Önce **ayrık değerlendirme seti** hazırlandı (`notebooks/turkish_queries.py`, 30 sorgu, sözlük ayarlanırken kullanılmadı). `notebooks/compare_glossary.py` (tüm katalog, ilk 10 isabet):
+
+  | | sözlüksüz | yalnız çeviri | özgün + çeviri ortalaması |
+  |---|---|---|---|
+  | geliştirme (19) | 0,805 | **0,884** | 0,879 |
+  | ayrık (30) | 0,680 | **0,830** | 0,833 |
+
+  Yöntem geliştirme setinde seçildi: **yalnız çeviri** (`text_search.encode_query`; metin araması ve "bunun gibi ama…" değişikliği). Kazananlar: "erkek kemer" 0 → 1,0, "sütyen" 0,1 → 0,9, "kazak" 0 → 0,9, "terlik" 0,3 → 1,0, "kadın tayt" 0,3 → 0,8. Gerileyenler: "topuklu ayakkabı" 1,0 → 0,7, "erkek şort" 1,0 → 0,7, "mor elbise" 0,5 → 0,3, "beyaz tişört" 0,8 → 0,7. Arayüz çeviriyi "Sözlükle aranan: …" diye gösteriyor. Testler 107 (sözlük + sahte modelle Türkçe sorgunun aramaya ulaştığı test). Model eğitimiyle (adaptör, +1 puan) karşılaştırınca sözlük çok daha etkili: Türkçe darboğazı kelime dağarcığıydı.
