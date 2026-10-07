@@ -231,7 +231,10 @@ def refine(results, segment=None, index=None, query_vec=None):
     if results and not filtered:
         st.warning("Seçili filtrelere uyan sonuç yok.")
     index_paths, index_features = index or (paths, features)
-    return mmr(filtered, index_paths, index_features, top_n, diversity=diversity, query_vector=query_vec)
+    # seçilen ürünün kopyaları ve birbirinin kopyası olan öneriler çıkarılır; gösterim benzerliğe göre sıralı
+    chosen = mmr(filtered, index_paths, index_features, top_n, diversity=diversity, query_vector=query_vec,
+                 drop_near_duplicates=True)
+    return sorted(chosen, key=lambda r: -r[1])
 
 
 def percent_text(pct):

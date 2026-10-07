@@ -60,3 +60,11 @@ def test_drop_near_duplicates_removes_copies_even_without_diversity(catalog):
     kept = names(mmr(results, paths, feats, 3, diversity=0, drop_near_duplicates=True))
     assert len({"a", "a_copy"} & set(kept)) == 1  # iki kopyadan yalnız biri
     assert "b" in kept
+
+
+def test_drop_near_duplicates_removes_copies_of_query(catalog):
+    paths, feats = catalog
+    query = feats[0]  # sorgu "a" ürününün kendisi gibi; a_copy onun kopyası
+    results = [r for r in ranked(paths, feats, query) if r[0].stem != "a"]
+    kept = names(mmr(results, paths, feats, 3, diversity=0, query_vector=query, drop_near_duplicates=True))
+    assert "a_copy" not in kept

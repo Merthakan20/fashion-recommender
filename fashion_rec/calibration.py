@@ -16,6 +16,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .data import catalog_index
+from .diversity import mmr
 from .recommend import recommend
 from .text_search import combined_search, search
 
@@ -47,6 +49,20 @@ def _scores(results_lists, top_k: int = TOP_K) -> list[float]:
     return [score for results in results_lists for _, score in results[:top_k]]
 
 
+def _dedupe(results, paths, features, query=None):
+    """Arayüzdeki gibi kopyaları ele (sorgunun başka ilanları, aynı ürünün iki ilanı) ve skora göre sırala.
+
+    Referans kopyaları içerseydi (benzerlik ≈ 1) çıta yapay olarak yükselir ve
+    gerçekten farklı ürünler düşük yüzde alırdı.
+    """
+    vector = None
+    if query is not None:
+        row = catalog_index(paths)[1].get(Path(query).resolve())
+        vector = features[row] if row is not None else None
+    kept = mmr(results, paths, features, TOP_K, diversity=0.0, query_vector=vector, drop_near_duplicates=True)
+    return sorted(kept, key=lambda r: -r[1])
+
+
 def image_scale(paths: list[Path], features: np.ndarray, color_features: np.ndarray | None = None,
                 color_weight: float = 0.0, sample: int = 100, subset: list[Path] | None = None) -> PercentScale:
     """Görselden öneri için referans: örnek katalog görsellerinin en iyi eşleşmelerinin skorları.
@@ -55,20 +71,19 @@ def image_scale(paths: list[Path], features: np.ndarray, color_features: np.ndar
     sonuçlar oraya sınırlanır; öneriler bölümle sınırlıyken yüzde de o
     bölümün tipik eşleşmeleriyle kıyaslanır.
     """
-    if subset is None:
-        return PercentScale(_scores(
-            recommend(q, paths, features, top_n=TOP_K, color_features=color_features, color_weight=color_weight)
-            for q in sample_paths(paths, sample)))
-    allowed = set(subset)
+    allowed = set(subset) if subset is not None else None
+    pool = list(subset) if subset is not None else paths
     return PercentScale(_scores(
-        [r for r in recommend(q, paths, features, top_n=len(paths), color_features=color_features,
-                              color_weight=color_weight) if r[0] in allowed]
-        for q in sample_paths(list(subset), sample)))
+        _dedupe([r for r in recommend(q, paths, features, top_n=len(paths), color_features=color_features,
+                                      color_weight=color_weight) if allowed is None or r[0] in allowed],
+                paths, features, q)
+        for q in sample_paths(pool, sample)))
 
 
 def text_scale(paths: list[Path], clip_features: np.ndarray, model, queries: list[str]) -> PercentScale:
     """Metinden arama için referans: genel kıyafet tariflerinin en iyi eşleşmelerinin skorları."""
-    return PercentScale(_scores(search(q, paths, clip_features, top_n=TOP_K, model=model) for q in queries))
+    return PercentScale(_scores(_dedupe(search(q, paths, clip_features, top_n=100, model=model), paths, clip_features)
+                                for q in queries))
 
 
 def combined_scale(paths: list[Path], clip_features: np.ndarray, model, queries: list[str],
@@ -80,6 +95,7 @@ def combined_scale(paths: list[Path], clip_features: np.ndarray, model, queries:
     allowed = set(subset) if subset is not None else None
     pool = list(subset) if subset is not None else paths
     return PercentScale(_scores(
-        [r for r in combined_search(image, q, paths, clip_features, top_n=len(paths) if allowed else TOP_K,
-                                    text_weight=text_weight, model=model) if allowed is None or r[0] in allowed]
+        _dedupe([r for r in combined_search(image, q, paths, clip_features, top_n=len(paths) if allowed else 100,
+                                            text_weight=text_weight, model=model) if allowed is None or r[0] in allowed],
+                paths, clip_features, image)
         for image in sample_paths(pool, sample) for q in queries))

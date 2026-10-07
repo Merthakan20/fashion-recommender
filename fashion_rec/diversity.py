@@ -35,7 +35,8 @@ def mmr(results: list[tuple[Path, float]], paths: list[Path], features: np.ndarr
     Skorlar değişmez, yalnızca sıra değişir. `diversity` 0 ise (ve kopya
     eleme kapalıysa) ilk `top_n` olduğu gibi döner. `drop_near_duplicates`
     seçilmiş bir öneriyle neredeyse aynı (> NEAR_DUPLICATE) adayları tamamen
-    eler (ör. aynı ürünün iki ilanı kombin yuvasında iki kez çıkmasın).
+    eler; `query_vector` verilmişse sorgunun kopyaları da elenir (ör. seçilen
+    ürünün başka bir ilanı önerilmesin, aynı ürünün iki ilanı yan yana çıkmasın).
     """
     if not 0 <= diversity <= 1:
         raise ValueError("diversity 0 ile 1 arasında olmalı")
@@ -61,6 +62,8 @@ def mmr(results: list[tuple[Path, float]], paths: list[Path], features: np.ndarr
     if query_vector is not None:
         redundancy = np.where(to_query > NEAR_DUPLICATE, to_query, -1.0)
     chosen, available = [], np.ones(len(candidates), dtype=bool)
+    if drop_near_duplicates and query_vector is not None:
+        available &= to_query <= NEAR_DUPLICATE
     while len(chosen) < min(top_n, len(candidates)):
         value = np.where(available, (1 - diversity) * relevance - diversity * redundancy, -np.inf)
         best = int(np.argmax(value))
