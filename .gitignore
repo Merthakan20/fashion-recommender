@@ -9,3 +9,4 @@ __pycache__/
 data/products/
 cache/
 notebooks/products_eval_cache.npz
+data/hm/

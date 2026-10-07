@@ -18,5 +18,22 @@
     "Unisex": {
       "color_weight": 0.4
     }
+  },
+  "hm": {
+    "Kadın": {
+      "color_weight": 0.1
+    },
+    "Erkek": {
+      "color_weight": 0.1
+    },
+    "Kız Çocuk": {
+      "color_weight": 0.3
+    },
+    "Erkek Çocuk": {
+      "color_weight": 0.3
+    },
+    "Aksesuar": {
+      "color_weight": 0.3
+    }
   }
 }

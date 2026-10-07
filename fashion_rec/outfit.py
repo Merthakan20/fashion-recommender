@@ -100,7 +100,7 @@ USAGE_COMPATIBLE = {
 }
 NEUTRALS = {"Black", "White", "Grey", "Grey Melange", "Navy Blue", "Beige", "Brown", "Charcoal", "Cream",
             "Off White", "Khaki", "Tan", "Taupe", "Nude", "Skin", "Silver", "Steel", "Gold", "Coffee Brown",
-            "Mushroom Brown", "Metallic", "Bronze", "Copper", "Denim"}
+            "Mushroom Brown", "Metallic", "Bronze", "Copper", "Denim", "Olive"}  # Olive: H&M "Khaki green"
 DENIM_TYPES = {"Jeans", "Jeggings"}  # kot, renk etiketi "Blue" olsa da nötr sayılır
 SEASON_GROUP = {"Summer": "sıcak", "Spring": "sıcak", "Fall": "soğuk", "Winter": "soğuk"}
 

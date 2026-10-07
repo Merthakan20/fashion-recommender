@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATASETS = {
     "women": PROJECT_ROOT / "data" / "women fashion",       # 93 kadın kıyafeti (git'te)
     "products": PROJECT_ROOT / "data" / "products" / "images",  # Fashion Product Images, 44 bin ürün (git dışında)
+    "hm": PROJECT_ROOT / "data" / "hm" / "images",              # H&M, ~25 bin ürünlük alt küme (git dışında)
 }
 # varsayılan: 44 bin ürünlük veri seti indirilmişse o, değilse git'teki kadın veri seti
 DATASET = os.environ.get("FASHION_DATASET") or ("products" if (DATASETS["products"] / "metadata.csv").exists() else "women")
@@ -17,7 +18,7 @@ if DATASET not in DATASETS:
 DATA_DIR = DATASETS[DATASET]
 # Görselden öneride kullanılan model: "vgg16" (25.088 boyut, küçük kataloglar) veya "clip" (512 boyut).
 # VGG16 vektörleri 44 bin üründe ~4,4 GB tutar; karşılaştırma: notebooks/evaluate_products.py
-IMAGE_BACKBONE = {"women": "vgg16", "products": "clip"}[DATASET]
+IMAGE_BACKBONE = {"women": "vgg16", "products": "clip", "hm": "clip"}[DATASET]
 METADATA_FILE = "metadata.csv"  # varsa görsellerle aynı klasörde: dosya adı -> ürün adı ve etiketler
 
 # Önbellekler veri setine özel: veri setleri arasında geçiş yapınca yeniden hesaplanmaz

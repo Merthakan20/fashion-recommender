@@ -207,12 +207,24 @@ Veri seti `FASHION_DATASET` ortam değişkeniyle seçilir; belirtilmezse `produc
 |---|---|---|
 | `women` | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
 | `products` (indirilmişse varsayılan) | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
+| `hm` | [H&M](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data) ürünlerinden ~25 bin ürünlük dengeli alt küme, `data/hm/`, git dışında. Temiz stüdyo çekimleri; cinsiyet, ürün grubu, ürün türü ve renk etiketli (kullanım etiketi yok: Spor dışı her şey "günlük"). | CLIP |
 
 ```bash
 streamlit run app.py                                   # products indirilmişse onu açar
 FASHION_DATASET=women streamlit run app.py             # 93 görsellik kadın veri seti
 python -m fashion_rec search "kız çocuk elbisesi"
 ```
+
+**`hm` kurulumu** (~1 GB disk, öğrenme amaçlı; haklar H&M'e ait, Kaggle yarışma kuralları gereği ticari olmayan kullanım):
+
+```bash
+python scripts/import_hm.py --limit 25000                # etiketler + görseller (~1 saat)
+FASHION_DATASET=hm python -m fashion_rec index           # CLIP vektörleri
+FASHION_DATASET=hm python scripts/tune_segments.py       # bölüm ayarları
+FASHION_DATASET=hm streamlit run app.py
+```
+
+Etiketler Hugging Face'teki `Qdrant/hm_ecommerce_products` kopyasından (oradaki görsel bağlantıları artık çalışmıyor), görseller `microsoft/hnm-search-data` deposundan alınır; bölümlere dengeli dağıtılır, aynı ürünün en fazla 2 renk çeşidi seçilir ve görseller 512 piksel yüksekliğe küçültülür.
 
 **`products` kurulumu** (~4 GB disk): `scripts/import_products.py` dosyasının başındaki komutla Hugging Face'teki 384×512 kopyayı (`benitomartin/fashion-product-images-small-384x512`, 5 parquet dosyası, 2 GB) `data/products/raw/` altına indirin, sonra:
 

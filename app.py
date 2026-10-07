@@ -4,6 +4,7 @@
 """
 
 import os
+import re
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -83,8 +84,14 @@ def product_picker():
     if len(paths) <= PICKER_LIMIT:
         return st.selectbox("Kıyafet", paths, format_func=label)
     words = st.text_input("Ürün adında ara", placeholder="ör. navy blue shirt, titan watch").lower().split()
-    # her kelime adda geçmeli, sıra önemsiz ("titan watch" → "Titan Women Silver Watch")
-    candidates = [p for p in paths if all(w in label(p).lower() for w in words)] if words else paths
+
+    def matches(path):
+        # her aranan kelime, addaki bir kelimenin başında geçmeli; sıra önemsiz
+        # ("titan watch" → "Titan Women Silver Watch"; "dress" → "welldressed" değil)
+        tokens = re.findall(r"\w+", label(path).lower())
+        return all(any(t.startswith(w) for t in tokens) for w in words)
+
+    candidates = [p for p in paths if matches(p)] if words else paths
     candidates = [p for p, _ in filter_results([(p, 0.0) for p in candidates], tag_lookup, selected_tags)]
     if not candidates:
         st.warning("Aramaya ve filtrelere uyan ürün yok.")
