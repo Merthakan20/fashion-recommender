@@ -18,7 +18,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # TensorFlow log kalabalığ
 from .catalog import display_name, load_metadata  # noqa: E402
 from .color import build_color_index  # noqa: E402
 from .backbone import build_image_index, clip_encoder  # noqa: E402
-from .config import IMAGE_BACKBONE  # noqa: E402
+from . import config  # noqa: E402
 from .recommend import recommend  # noqa: E402
 from .tags import build_tag_index  # noqa: E402
 from .text_search import build_text_index, combined_search, load_clip_model, search  # noqa: E402
@@ -46,8 +46,8 @@ def weight(value: str) -> float:
 
 def cmd_index(args) -> None:
     paths, features = build_image_index(force=args.force)
-    print(f"{len(paths)} görsel indekslendi ({IMAGE_BACKBONE}), vektör boyutu: {features.shape[1]}")
-    if args.text and IMAGE_BACKBONE != "clip":  # CLIP backbone'unda metin indeksi zaten aynı
+    print(f"{len(paths)} görsel indekslendi ({config.IMAGE_BACKBONE}), vektör boyutu: {features.shape[1]}")
+    if args.text and config.IMAGE_BACKBONE != "clip":  # CLIP backbone'unda metin indeksi zaten aynı
         paths, features = build_text_index(force=args.force)
         print(f"{len(paths)} görsel metin araması için indekslendi, vektör boyutu: {features.shape[1]}")
 
@@ -60,7 +60,7 @@ def cmd_recommend(args) -> None:
     paths, features = build_image_index()
     color_features = build_color_index()[1] if args.c > 0 else None
     encode = None
-    if IMAGE_BACKBONE == "clip" and image.resolve() not in set(paths):
+    if config.IMAGE_BACKBONE == "clip" and image.resolve() not in set(paths):
         encode = clip_encoder(load_clip_model())
     results = recommend(image, paths, features, top_n=args.n, encode=encode,
                         color_features=color_features, color_weight=args.c)

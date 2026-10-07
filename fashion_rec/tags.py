@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import TAG_CACHE_PATH
+from . import config
 from .features import cached_features
 from .text_search import clip_key, load_clip_model, normalize
 
@@ -36,7 +36,7 @@ TAG_GROUPS = {
 Tags = dict[str, list[str]]  # grup -> görsel başına etiket (paths ile aynı sırada)
 
 
-def build_tag_index(paths: list[Path], clip_features: np.ndarray, cache_path: Path = TAG_CACHE_PATH,
+def build_tag_index(paths: list[Path], clip_features: np.ndarray, cache_path: Path | None = None,
                     model=None, force: bool = False) -> Tags:
     """Her görsele her gruptan en uygun etiketi verir; sonuç önbelleğe yazılır.
 
@@ -52,7 +52,7 @@ def build_tag_index(paths: list[Path], clip_features: np.ndarray, cache_path: Pa
         return np.stack(columns, axis=1)
 
     key = clip_key() + "/" + json.dumps(TAG_GROUPS, ensure_ascii=False, sort_keys=True)
-    indices = cached_features(paths, cache_path, compute, force, key=key)
+    indices = cached_features(paths, cache_path or config.TAG_CACHE_PATH, compute, force, key=key)
     return {group: [list(labels)[i] for i in indices[:, g]] for g, (group, labels) in enumerate(TAG_GROUPS.items())}
 
 

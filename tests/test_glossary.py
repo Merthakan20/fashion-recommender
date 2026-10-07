@@ -38,3 +38,20 @@ def test_search_uses_glossary(data_dir, tmp_path, clip_model):
     assert search("yeşil elbise", paths, feats, top_n=1, model=clip_model)[0][0].name == "green.jpg"
     results = combined_search(data_dir / "blue.jpeg", "yeşil", paths, feats, top_n=1, text_weight=1, model=clip_model)
     assert results[0][0].name == "green.jpg"
+
+
+@pytest.mark.parametrize("query, expected", [
+    ("kız çocuk elbisesi", "Kız Çocuk"),
+    ("erkek çocuk tişört", "Erkek Çocuk"),      # "erkek"ten önce
+    ("erkek gömleği", "Erkek"),
+    ("kadınlar için çanta", "Kadın"),
+    ("girls dress", "Kız Çocuk"),
+    ("men's jacket", "Erkek"),
+    ("kırmızı elbise", None),
+    ("menthol", None),                           # kısa kök uzun kelimede eşleşmez
+    ("siyah manto", None),                       # "man" kökü Türkçe "manto"yu yakalamaz
+])
+def test_gender_in_query(query, expected):
+    from fashion_rec.glossary import gender_in_query
+
+    assert gender_in_query(query) == expected

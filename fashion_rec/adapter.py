@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import CLIP_ADAPTER_PATH
+from . import config
 
 
 def _normalize(x: np.ndarray) -> np.ndarray:
@@ -41,6 +41,7 @@ class Adapter:
         return cls(data["w_image"], data["b_image"], data["w_text"], data["b_text"], signature)
 
 
-def current_adapter(path: Path = CLIP_ADAPTER_PATH) -> Adapter | None:
+def current_adapter(path: Path | None = None) -> Adapter | None:
     """Veri setinin adaptörü varsa onu, yoksa None (CLIP olduğu gibi kullanılır)."""
+    path = path or config.CLIP_ADAPTER_PATH
     return Adapter.load(path) if Path(path).exists() else None

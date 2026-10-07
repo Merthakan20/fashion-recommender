@@ -5,7 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import BATCH_SIZE, CACHE_PATH, DATA_DIR, IMAGE_SIZE
+from . import config
+from .config import BATCH_SIZE, IMAGE_SIZE
 from .data import list_images
 
 
@@ -48,7 +49,7 @@ def extract_features(model, paths: list[Path]) -> np.ndarray:
     return features / np.linalg.norm(features, axis=1, keepdims=True)
 
 
-def build_index(data_dir: Path = DATA_DIR, cache_path: Path = CACHE_PATH,
+def build_index(data_dir: Path | None = None, cache_path: Path | None = None,
                 model=None, force: bool = False) -> tuple[list[Path], np.ndarray]:
     """Veri setinin (görsel yolları, özellik matrisi) ikilisini döndürür.
 
@@ -56,7 +57,7 @@ def build_index(data_dir: Path = DATA_DIR, cache_path: Path = CACHE_PATH,
     kullanılır; değilse (veya force=True ise) özellikler yeniden çıkarılır.
     """
     paths = list_images(data_dir)
-    return paths, cached_features(paths, cache_path,
+    return paths, cached_features(paths, cache_path or config.CACHE_PATH,
                                   lambda: extract_features(model or load_model(), paths), force)
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .catalog import Metadata, corrected_gender
+from .catalog import Metadata, compatible_genders, corrected_gender
 from .diversity import mmr
 from .features import cached_features
 
@@ -132,9 +132,7 @@ def colour_harmony(a: str, b: str) -> float:
 
 
 def gender_ok(query_gender: str, candidate_gender: str) -> bool:
-    if candidate_gender == "Unisex" or query_gender == candidate_gender:
-        return True
-    return query_gender == "Unisex" and candidate_gender in {"Men", "Women"}
+    return candidate_gender in compatible_genders(query_gender)
 
 
 def zscore(x: np.ndarray) -> np.ndarray:
@@ -169,11 +167,7 @@ class OutfitCatalog:
         """Yuvanın aday sıraları: yuva rolü + uygun cinsiyet + (varsa) uyumlu kullanım."""
         gender = corrected_gender(query_row)
         usage = query_row.get("usage", "") or "Casual"
-        if gender == "Unisex":
-            mask = np.isin(self.gender, ["Men", "Women", "Unisex"])
-        else:
-            mask = (self.gender == gender) | (self.gender == "Unisex")
-        mask &= self.role == slot
+        mask = np.isin(self.gender, list(compatible_genders(gender))) & (self.role == slot)
         if exclude is not None and exclude in self.index:
             mask[self.index[exclude]] = False
         if slot == "aksesuar":  # aynı tür aksesuarı önerme (saate saat)

@@ -5,7 +5,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .config import COLOR_BINS, COLOR_CACHE_PATH, COLOR_CROP, DATA_DIR
+from . import config
+from .config import COLOR_BINS, COLOR_CROP
 from .data import list_images
 from .features import cached_features
 
@@ -30,9 +31,9 @@ def extract_color_features(paths: list[Path]) -> np.ndarray:
     return np.stack([color_histogram(p) for p in paths])
 
 
-def build_color_index(data_dir: Path = DATA_DIR, cache_path: Path = COLOR_CACHE_PATH,
+def build_color_index(data_dir: Path | None = None, cache_path: Path | None = None,
                       force: bool = False) -> tuple[list[Path], np.ndarray]:
     """Veri setinin (görsel yolları, renk vektörleri) ikilisini döndürür; önbellek kuralları `build_index` ile aynı."""
     paths = list_images(data_dir)
-    return paths, cached_features(paths, cache_path, lambda: extract_color_features(paths), force,
+    return paths, cached_features(paths, cache_path or config.COLOR_CACHE_PATH, lambda: extract_color_features(paths), force,
                                   key=f"hsv{COLOR_BINS}-crop{COLOR_CROP}")

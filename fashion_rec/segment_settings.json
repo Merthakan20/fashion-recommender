@@ -32,8 +32,11 @@
     "Erkek Çocuk": {
       "color_weight": 0.3
     },
-    "Aksesuar": {
+    "Çocuk": {
       "color_weight": 0.3
+    },
+    "Aksesuar": {
+      "color_weight": 0.2
     }
   }
 }

@@ -9,13 +9,13 @@ import csv
 import re
 from pathlib import Path
 
-from .config import DATA_DIR, METADATA_FILE
+from . import config
 
 Metadata = dict[str, dict[str, str]]  # dosya adı -> {sütun: değer}
 
 
-def load_metadata(data_dir: Path = DATA_DIR) -> Metadata:
-    path = Path(data_dir) / METADATA_FILE
+def load_metadata(data_dir: Path | None = None) -> Metadata:
+    path = Path(data_dir or config.DATA_DIR) / config.METADATA_FILE
     if not path.exists():
         return {}
     with open(path, newline="", encoding="utf-8") as f:
@@ -34,7 +34,7 @@ def display_name(path: Path, metadata: Metadata) -> str:
 # Filtre olarak gösterilecek metadata sütunları: grup adı -> (sütun, Türkçe karşılıklar)
 LABEL_GROUPS = {
     "Cinsiyet": ("gender", {"Men": "Erkek", "Women": "Kadın", "Boys": "Erkek Çocuk", "Girls": "Kız Çocuk",
-                            "Unisex": "Unisex"}),
+                            "Kids": "Çocuk", "Unisex": "Unisex"}),
     "Kategori": ("masterCategory", {"Apparel": "Giyim", "Accessories": "Aksesuar", "Footwear": "Ayakkabı",
                                     "Personal Care": "Kişisel Bakım", "Free Items": "Hediye",
                                     "Sporting Goods": "Spor Malzemesi", "Home": "Ev"}),
@@ -83,7 +83,29 @@ def metadata_tags(paths: list[Path], metadata: Metadata) -> dict[str, dict[str, 
 
 
 # Bölümler: aksesuarlar cinsiyetten bağımsız tek bölüm, diğer ürünler (giyim, ayakkabı, kişisel bakım) cinsiyete göre
-SEGMENTS = ["Kadın", "Erkek", "Kız Çocuk", "Erkek Çocuk", "Aksesuar", "Unisex"]
+SEGMENTS = ["Kadın", "Erkek", "Kız Çocuk", "Erkek Çocuk", "Çocuk", "Aksesuar", "Unisex"]
+# "Çocuk" (Kids): cinsiyeti belirsiz çocuk ürünleri (H&M çocuk ayakkabıları) hem kız hem erkek çocuğa uyar
+KIDS_SEGMENTS = {"Kız Çocuk", "Erkek Çocuk", "Çocuk"}
+
+
+def compatible_segments(segment: str) -> set[str]:
+    """Bir bölümün / cinsiyet etiketinin önerilerde kabul ettiği bölümler."""
+    if segment in ("Kız Çocuk", "Erkek Çocuk"):
+        return {segment, "Çocuk"}
+    if segment == "Çocuk":
+        return set(KIDS_SEGMENTS)
+    return {segment}
+
+
+def compatible_genders(gender: str) -> set[str]:
+    """Bir cinsiyetin (metadata değeri) kombin önerisinde kabul ettiği cinsiyetler; unisex ürünler herkese uyar."""
+    if gender in ("Girls", "Boys"):
+        return {gender, "Kids", "Unisex"}
+    if gender == "Kids":
+        return {"Girls", "Boys", "Kids", "Unisex"}
+    if gender == "Unisex":
+        return {"Men", "Women", "Unisex"}
+    return {gender, "Unisex"}
 
 
 def segment_of(row: dict[str, str]) -> str | None:

@@ -100,3 +100,34 @@ def translate(text: str) -> str | None:
             out.append(tokens[i])
             i += 1
     return " ".join(out) if found else None
+
+
+# sorgudaki cinsiyet / yaş ifadeleri → arayüzdeki Cinsiyet etiketi (çocuk ifadeleri önce: "erkek çocuk" ≠ "erkek")
+_GENDER_PHRASES = [
+    (("kız", "çocuk"), "Kız Çocuk"), (("erkek", "çocuk"), "Erkek Çocuk"), (("girls",), "Kız Çocuk"),
+    (("girl",), "Kız Çocuk"), (("boys",), "Erkek Çocuk"), (("boy",), "Erkek Çocuk"),
+    (("kadın",), "Kadın"), (("bayan",), "Kadın"), (("women",), "Kadın"), (("woman",), "Kadın"),
+    (("ladies",), "Kadın"), (("erkek",), "Erkek"), (("men",), "Erkek"), (("man",), "Erkek"),
+]
+
+
+def gender_in_query(text: str) -> str | None:
+    """Sorguda geçen cinsiyet / yaş ifadesi ("kız çocuk elbisesi" → "Kız Çocuk"); yoksa None.
+
+    Metin araması cinsiyet bilmez (H&M adlarında "girl" geçmez); arayüz bunu
+    sonuçları süzmek için kullanır. Ekli haller kökten tanınır ("kadınlar").
+    """
+    tokens = re.findall(r"[\wçğıöşüâîû-]+", turkish_lower(text))
+    for stems, label in _GENDER_PHRASES:
+        for i in range(len(tokens) - len(stems) + 1):
+            if all(_gender_token(tokens[i + k], stems[k]) for k in range(len(stems))):
+                return label
+    return None
+
+
+_ENGLISH_GENDER = {"girls", "girl", "boys", "boy", "women", "woman", "ladies", "men", "man"}
+
+
+def _gender_token(token: str, stem: str) -> bool:
+    # İngilizce kelimeler tam eşleşir: "man" kökü "manto"yu (palto) yakalamasın
+    return token == stem if stem in _ENGLISH_GENDER else _matches(token, stem)

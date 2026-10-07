@@ -4,14 +4,14 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import IMAGE_BACKBONE
+from . import config
 from .features import build_index
 from .text_search import build_text_index, normalize
 
 
 def build_image_index(force: bool = False, clip_model=None) -> tuple[list[Path], np.ndarray]:
     """Görselden öneri için (yollar, vektörler): VGG16 veya CLIP görsel vektörleri."""
-    if IMAGE_BACKBONE == "clip":
+    if config.IMAGE_BACKBONE == "clip":
         return build_text_index(model=clip_model, force=force)
     return build_index(force=force)
 

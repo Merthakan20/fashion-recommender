@@ -5,7 +5,8 @@ from pathlib import Path
 import numpy as np
 
 from .adapter import current_adapter
-from .config import BATCH_SIZE, CLIP_CACHE_PATH, CLIP_MODEL, CLIP_PRETRAINED, DATA_DIR
+from . import config
+from .config import BATCH_SIZE, CLIP_MODEL, CLIP_PRETRAINED
 from .data import catalog_index, list_images
 from .features import cached_features, report_progress
 from .glossary import translate
@@ -67,14 +68,14 @@ def load_clip_model() -> ClipModel:
     return ClipModel()
 
 
-def build_text_index(data_dir: Path = DATA_DIR, cache_path: Path = CLIP_CACHE_PATH,
+def build_text_index(data_dir: Path | None = None, cache_path: Path | None = None,
                      model=None, force: bool = False) -> tuple[list[Path], np.ndarray]:
     """Veri setinin (görsel yolları, L2 normalize CLIP vektörleri) ikilisini döndürür.
 
     Önbellek kuralları `build_index` ile aynıdır.
     """
     paths = list_images(data_dir)
-    return paths, cached_features(paths, cache_path,
+    return paths, cached_features(paths, cache_path or config.CLIP_CACHE_PATH,
                                   lambda: normalize((model or load_clip_model()).encode_images(paths)),
                                   force, key=clip_key())
 

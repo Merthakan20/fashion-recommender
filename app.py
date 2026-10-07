@@ -17,13 +17,15 @@ from fashion_rec.backbone import build_image_index, clip_encoder  # noqa: E402
 from fashion_rec.calibration import combined_scale, image_scale, text_scale  # noqa: E402
 from collections import Counter  # noqa: E402
 
-from fashion_rec.catalog import display_name, load_metadata, majority_segment, metadata_tags, segments  # noqa: E402
+from fashion_rec.catalog import (compatible_segments, display_name, load_metadata, majority_segment,  # noqa: E402
+                                 metadata_tags, segments)
 from fashion_rec.color import build_color_index  # noqa: E402
-from fashion_rec.config import IMAGE_BACKBONE, IMAGE_EXTENSIONS, ROLE_CACHE_PATH  # noqa: E402
+from fashion_rec import config  # noqa: E402
+from fashion_rec.config import IMAGE_EXTENSIONS  # noqa: E402
 from fashion_rec.copurchase import PURCHASE_WEIGHTS, bought_together, load_copurchase  # noqa: E402
 from fashion_rec.data import catalog_index  # noqa: E402
 from fashion_rec.diversity import mmr  # noqa: E402
-from fashion_rec.glossary import translate  # noqa: E402
+from fashion_rec.glossary import gender_in_query, translate  # noqa: E402
 from fashion_rec.outfit import OutfitCatalog, Weights, clip_roles, infer_row  # noqa: E402
 from fashion_rec.segment_settings import load_settings, setting  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
@@ -111,7 +113,7 @@ REFERENCE_MODIFIERS = ["kırmızı", "siyah", "beyaz", "mavi", "uzun kollu", "pa
 def get_image_scale(color_weight, segment=None):
     """Öneriler bir bölümle sınırlıysa ölçek de o bölümün tipik eşleşmelerinden hesaplanır."""
     color_features = get_color_features() if color_weight > 0 else None
-    subset = [p for p in paths if segment_lookup.get(p.name) == segment] if segment else None
+    subset = [p for p in paths if segment_lookup.get(p.name) in compatible_segments(segment)] if segment else None
     return image_scale(paths, features, color_features=color_features, color_weight=color_weight, subset=subset)
 
 
@@ -124,7 +126,7 @@ def get_text_scale():
 @st.cache_resource(show_spinner="Benzerlik ölçeği hazırlanıyor...")
 def get_combined_scale(text_weight, segment=None):
     text_paths, text_features = get_text_index()
-    subset = [p for p in text_paths if segment_lookup.get(p.name) == segment] if segment else None
+    subset = [p for p in text_paths if segment_lookup.get(p.name) in compatible_segments(segment)] if segment else None
     return combined_scale(text_paths, text_features, get_clip_model(), REFERENCE_MODIFIERS,
                           text_weight=text_weight, sample=10, subset=subset)
 
@@ -156,7 +158,7 @@ def find_similar(image_path, modifier, top_n, text_weight, color_weight):
         # veri setindeki görselin vektörü önbellekte: model yalnızca yüklenen görsel için açılır
         model = encode = None
         if image_path not in catalog_index(paths)[1]:
-            if IMAGE_BACKBONE == "clip":
+            if config.IMAGE_BACKBONE == "clip":
                 encode = clip_encoder(get_clip_model())
             else:
                 model = get_model()
@@ -189,8 +191,8 @@ def get_outfit_catalog():
     """Kombin önerisi CLIP vektörleriyle çalışır; metadata'sı olmayan veri setinde None."""
     if not get_metadata():
         return None
-    clip_paths, clip_features = (paths, features) if IMAGE_BACKBONE == "clip" else get_text_index()
-    roles = clip_roles(clip_paths, clip_features, ROLE_CACHE_PATH)
+    clip_paths, clip_features = (paths, features) if config.IMAGE_BACKBONE == "clip" else get_text_index()
+    roles = clip_roles(clip_paths, clip_features, config.ROLE_CACHE_PATH)
     return OutfitCatalog(clip_paths, clip_features, get_metadata(), visual_roles=roles,
                          copurchase=load_copurchase(clip_paths))
 
@@ -262,7 +264,7 @@ def refine(results, segment=None, index=None, query_vec=None):
     `index` = sonuçların geldiği (yollar, vektörler); çeşitlilik bu vektörlerle ölçülür.
     """
     if segment and same_segment:
-        results = [(p, s) for p, s in results if segment_lookup.get(p.name) == segment]
+        results = [(p, s) for p, s in results if segment_lookup.get(p.name) in compatible_segments(segment)]
     filtered = filter_results(results, tag_lookup, selected_tags)
     if results and not filtered:
         st.warning("Seçili filtrelere uyan sonuç yok.")
@@ -293,6 +295,19 @@ def show_grid(results, scale):
 st.set_page_config(page_title="Fashion Recommender", page_icon="👗", layout="wide")
 st.title("👗 Fashion Recommender")
 st.caption("Bir kıyafet seçin, yükleyin veya tarif edin; en çok benzeyen kıyafetleri önerelim.")
+
+# Veri seti seçici: değişince yalnız veri setine bağlı önbellekler temizlenir (CLIP / VGG16 modelleri kalır)
+DATASET_CACHES = [get_index, get_metadata, get_tag_lookup, get_filter_options, get_segment_lookup,
+                  get_color_features, get_text_index, get_image_scale, get_text_scale, get_combined_scale,
+                  get_outfit_catalog]
+datasets = config.available_datasets()
+with st.sidebar:
+    chosen = st.selectbox("Veri seti", datasets, index=datasets.index(config.DATASET) if config.DATASET in datasets else 0,
+                          format_func=lambda d: config.DATASET_LABELS.get(d, d))
+if chosen != config.DATASET:
+    config.set_dataset(chosen)
+    for cached in DATASET_CACHES:
+        cached.clear()
 
 paths, features = get_index()
 tag_lookup, automatic_tags = get_tag_lookup()
@@ -327,12 +342,18 @@ if source == "Metinle ara":
         st.info("Başlamak için bir tarif yazın, ör. *siyah dantel elbise* veya *white trousers*.")
     else:
         text_paths, text_features = get_text_index()
-        if translate(query):
-            st.caption(f"Sözlükle aranan: *{translate(query)}*")
+        results = search(query, text_paths, text_features, top_n=len(paths), model=get_clip_model())
+        notes = [f"Sözlükle aranan: *{translate(query)}*"] if translate(query) else []
+        # sorgudaki cinsiyet ("kız çocuk elbisesi") sonuçları süzer; aksesuarlar da kalsın diye bölüme değil cinsiyete göre
+        gender = gender_in_query(query)
+        if gender and same_segment and any("Cinsiyet" in t for t in tag_lookup.values()):
+            allowed = compatible_segments(gender) | {"Unisex"}
+            results = [(p, s) for p, s in results if tag_lookup[p.name].get("Cinsiyet") in allowed]
+            notes.append(f"Cinsiyet: **{gender}** (sorgudan; kapatmak için \"Aynı bölümden öner\")")
+        if notes:
+            st.caption(" · ".join(notes))
         st.subheader("Sonuçlar")
-        show_grid(refine(search(query, text_paths, text_features, top_n=len(paths), model=get_clip_model()),
-                         index=(text_paths, text_features)),
-                  get_text_scale())
+        show_grid(refine(results, index=(text_paths, text_features)), get_text_scale())
 else:
     if source == "Veri setinden seç":
         query_image = product_picker()

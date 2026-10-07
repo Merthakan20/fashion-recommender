@@ -79,3 +79,12 @@ def test_corrected_gender_fixes_kids_items_labelled_as_adults():
     assert corrected_gender({"gender": "Women", "name": "Levis Women Boyfriend Jeans"}) == "Women"  # "boyfriend" değil
     assert corrected_gender({"gender": "Unisex", "name": "Kids Girls Cap"}) == "Unisex"  # yalnız yetişkin etiketleri düzeltilir
     assert segment_of({"gender": "Women", "masterCategory": "Apparel", "name": "Gini and Jony Kids Girls Tops"}) == "Kız Çocuk"
+
+
+def test_kids_items_fit_both_kids_segments():
+    from fashion_rec.catalog import compatible_genders, compatible_segments, segment_of
+
+    assert segment_of({"gender": "Kids", "masterCategory": "Footwear"}) == "Çocuk"
+    assert "Çocuk" in compatible_segments("Kız Çocuk") and "Çocuk" in compatible_segments("Erkek Çocuk")
+    assert compatible_segments("Kadın") == {"Kadın"}                      # yetişkine çocuk ürünü gelmez
+    assert "Kids" in compatible_genders("Girls") and "Kids" not in compatible_genders("Women")

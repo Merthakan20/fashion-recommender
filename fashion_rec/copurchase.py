@@ -14,15 +14,16 @@ import numpy as np
 from scipy import sparse
 
 from .catalog import Metadata, display_name
-from .config import COPURCHASE_PATH
+from . import config
 from .outfit import Weights
 
 # kombin önerisinde kurallara eklenen ağırlıklar (değerlendirmede MRR ile seçildi)
 PURCHASE_WEIGHTS = Weights(copurchase=8, popularity=1)
 
 
-def load_copurchase(paths: list[Path], path: Path = COPURCHASE_PATH):
+def load_copurchase(paths: list[Path], path: Path | None = None):
     """Birlikte alınma matrisi; dosya yoksa veya katalogla uyuşmuyorsa None."""
+    path = path or config.COPURCHASE_PATH
     if not Path(path).exists():
         return None
     matrix = sparse.load_npz(path).tocsr()

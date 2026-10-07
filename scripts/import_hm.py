@@ -37,7 +37,8 @@ RAW = PROJECT_ROOT / "data" / "hm" / "raw" / "hm_ecommerce_products_enriched.par
 OUT_DIR = PROJECT_ROOT / "data" / "hm" / "images"
 META_URL = "https://huggingface.co/datasets/Qdrant/hm_ecommerce_products/resolve/main/hm_ecommerce_products_enriched.parquet"
 IMAGE_URL = "https://huggingface.co/datasets/microsoft/hnm-search-data/resolve/main/data/raw/images/{}/{}.jpg"
-TARGETS = {"Kadın": 0.32, "Erkek": 0.24, "Kız Çocuk": 0.14, "Erkek Çocuk": 0.12, "Aksesuar": 0.18}
+TARGETS = {"Kadın": 0.32, "Erkek": 0.24, "Kız Çocuk": 0.14, "Erkek Çocuk": 0.12, "Aksesuar": 0.18,
+           "Çocuk": 0.05}  # Çocuk: cinsiyeti belirsiz çocuk ayakkabıları (kotanın üstüne eklenir)
 MAX_PER_PRODUCT, IMAGE_HEIGHT, WORKERS, SEED = 2, 512, 8, 0
 
 ACCESSORY_SUB = {
@@ -67,7 +68,9 @@ def gender(row) -> str:
             return "Girls"
         if "Boy" in section:
             return "Boys"
-    return ""  # cinsiyeti belirsiz çocuk ürünleri (bebek temel ürünleri, çocuk dış giyim…) alınmaz
+        if section == "Kids & Baby Shoes" and row.product_group_name == "Shoes":
+            return "Kids"  # H&M çocuk ayakkabılarını cinsiyetsiz tutar; kız ve erkek çocuk kombinlerine uyar
+    return ""  # diğer cinsiyeti belirsiz çocuk ürünleri (bebek temel ürünleri, çocuk dış giyim…) alınmaz
 
 
 def to_metadata(row) -> dict[str, str] | None:
@@ -101,7 +104,7 @@ def to_metadata(row) -> dict[str, str] | None:
 def segment(meta) -> str:
     if meta["masterCategory"] == "Accessories":
         return "Aksesuar"
-    return {"Women": "Kadın", "Men": "Erkek", "Girls": "Kız Çocuk", "Boys": "Erkek Çocuk"}[meta["gender"]]
+    return {"Women": "Kadın", "Men": "Erkek", "Girls": "Kız Çocuk", "Boys": "Erkek Çocuk", "Kids": "Çocuk"}[meta["gender"]]
 
 
 def select(limit: int) -> list[dict[str, str]]:

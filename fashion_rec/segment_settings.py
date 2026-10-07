@@ -8,16 +8,16 @@ veya veri seti için varsayılanlar kullanılır.
 import json
 from pathlib import Path
 
-from .config import DATASET
+from . import config
 
 SETTINGS_PATH = Path(__file__).resolve().parent / "segment_settings.json"
 DEFAULTS = {"color_weight": 0.0}
 
 
-def load_settings(path: Path = SETTINGS_PATH, dataset: str = DATASET) -> dict[str, dict]:
+def load_settings(path: Path = SETTINGS_PATH, dataset: str | None = None) -> dict[str, dict]:
     if not Path(path).exists():
         return {}
-    return json.loads(Path(path).read_text(encoding="utf-8")).get(dataset, {})
+    return json.loads(Path(path).read_text(encoding="utf-8")).get(dataset or config.DATASET, {})
 
 
 def setting(segment: str | None, key: str, settings: dict[str, dict]) -> float:

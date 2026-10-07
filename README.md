@@ -202,13 +202,13 @@ Ayarlar (veri klasörü, önbellek yolları, görsel boyutu, batch boyutu, CLIP 
 
 ## Veri setleri
 
-Veri seti `FASHION_DATASET` ortam değişkeniyle seçilir; belirtilmezse `products` indirilmişse o, değilse `women` kullanılır. Önbellekler `cache/<veri seti>/` altında ayrı tutulur.
+Veri seti arayüzde kenar çubuğundaki **Veri seti** seçicisinden değiştirilir (yalnız indirilmiş veri setleri listelenir); başlangıç değeri `FASHION_DATASET` ortam değişkeniyle verilebilir, belirtilmezse `products` indirilmişse o, değilse `women` açılır. Önbellekler `cache/<veri seti>/` altında ayrı tutulur.
 
 | ad | içerik | görsel öneri modeli |
 |---|---|---|
 | `women` | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
 | `products` (indirilmişse varsayılan) | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
-| `hm` | [H&M](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data) ürünlerinden ~25 bin ürünlük dengeli alt küme, `data/hm/`, git dışında. Temiz stüdyo çekimleri; cinsiyet, ürün grubu, ürün türü ve renk etiketli (kullanım etiketi yok: Spor dışı her şey "günlük"). | CLIP |
+| `hm` | [H&M](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data) ürünlerinden ~26 bin ürünlük dengeli alt küme (1.220 cinsiyetsiz çocuk ayakkabısı dahil: "Çocuk", hem kız hem erkek çocuğa önerilir), `data/hm/`, git dışında. Temiz stüdyo çekimleri; cinsiyet, ürün grubu, ürün türü ve renk etiketli (kullanım etiketi yok: Spor dışı her şey "günlük"). | CLIP |
 
 ```bash
 streamlit run app.py                                   # products indirilmişse onu açar
@@ -265,6 +265,8 @@ Veri setinde adında "girl" geçen 185, "boy" geçen 210 ürün yetişkin olarak
 - yüklenen görselde ürün türü, cinsiyet ve kullanım en yakın 20 komşudan tahmin edilir.
 
 Vekil ölçütler (`notebooks/outfit_examples.py`, 500 sorgu; sezgisel bu kuralları kullandığı için yalnızca kuralların işlediğini gösterir): kullanım birebir 0,84 (rastgele) / 0,89 (yalnız CLIP) / **0,97**; renk uyumu 0,88 / 0,81 / **0,98**. Asıl değerlendirme gözle: `notebooks/outfit_examples/examples.png`. Sınırlama: desen uyumuna bakmaz (ekose gömleğe ekose şort önerebilir).
+
+**Metin aramasında cinsiyet**: sorgudaki cinsiyet / yaş ifadesi ("kız çocuk elbisesi", "erkek gömleği", "women") sonuçları süzer (`glossary.gender_in_query`); aksesuarlar kaybolmasın diye bölüme değil ürünün cinsiyetine göre süzülür, "Aynı bölümden öner" kapatılınca devre dışı kalır.
 
 **Birlikte alınanlar ve satın alma verisiyle kombin (H&M)**: H&M'in 31,8 milyon satın alma kaydından (2018–2020) katalogdaki ürünleri içeren 5,6 milyon satır kullanılır (`scripts/build_copurchase.py`). Sepet = aynı müşterinin aynı gün aldıkları; ~1 milyon sepetten 1,6 milyon ürün çifti çıkar. Arayüzde H&M veri setinde üçüncü sekme **Birlikte alınanlar** (aynı ürünün başka renkleri hariç) ve kombin önerisinde birlikte alınma sinyali (`fashion_rec/copurchase.py`).
 
