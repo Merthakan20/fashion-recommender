@@ -185,6 +185,7 @@ fashion-recommender/
 │   ├── glossary.py       # Türkçe moda terimleri sözlüğü (sorgu çevirisi)
 │   ├── diversity.py      # çeşitlilik (MMR yeniden sıralama)
 │   ├── outfit.py         # kombin önerisi
+│   ├── copurchase.py     # birlikte alınanlar (satın alma kayıtları)
 │   ├── segment_settings.py   # bölüm bazında ayarlar
 │   └── segment_settings.json # scripts/tune_segments.py çıktısı
 ├── app.py                # Streamlit arayüzü
@@ -264,6 +265,20 @@ Veri setinde adında "girl" geçen 185, "boy" geçen 210 ürün yetişkin olarak
 - yüklenen görselde ürün türü, cinsiyet ve kullanım en yakın 20 komşudan tahmin edilir.
 
 Vekil ölçütler (`notebooks/outfit_examples.py`, 500 sorgu; sezgisel bu kuralları kullandığı için yalnızca kuralların işlediğini gösterir): kullanım birebir 0,84 (rastgele) / 0,89 (yalnız CLIP) / **0,97**; renk uyumu 0,88 / 0,81 / **0,98**. Asıl değerlendirme gözle: `notebooks/outfit_examples/examples.png`. Sınırlama: desen uyumuna bakmaz (ekose gömleğe ekose şort önerebilir).
+
+**Birlikte alınanlar ve satın alma verisiyle kombin (H&M)**: H&M'in 31,8 milyon satın alma kaydından (2018–2020) katalogdaki ürünleri içeren 5,6 milyon satır kullanılır (`scripts/build_copurchase.py`). Sepet = aynı müşterinin aynı gün aldıkları; ~1 milyon sepetten 1,6 milyon ürün çifti çıkar. Arayüzde H&M veri setinde üçüncü sekme **Birlikte alınanlar** (aynı ürünün başka renkleri hariç) ve kombin önerisinde birlikte alınma sinyali (`fashion_rec/copurchase.py`).
+
+Kombin önerisinin ilk gerçek ölçümü (`notebooks/evaluate_copurchase.py`): 2020-06-22 öncesiyle öğrenilip sonraki 3 ayın sepetlerinde test edildi; ölçüt, müşterinin sorgu ürünüyle aynı gün aldığı tamamlayıcı parçanın (ör. üstle alınan pantolon) yuvadaki ~2.200 aday arasında ilk 10'a girme oranı:
+
+| yöntem | ilk 10 (tümü) | geçmişi olan ürünler | yeni ürünler |
+|---|---|---|---|
+| rastgele | 0,004 | 0,004 | 0,012 |
+| kurallar (önceki kombin) | 0,026 | 0,022 | 0,035 |
+| çok satanlar | 0,043 | 0,046 | 0,035 |
+| birlikte alınma | 0,087 | 0,109 | — |
+| **kurallar + birlikte alınma + çok satanlar** | **0,088** | **0,110** | 0,035 |
+
+Kurallar tek başına çok satanlardan bile zayıf çıktı; birlikte alınma, geçmişi olan ürünlerde kurallardan ~5 kat iyi. Yeni ürünlerde (satış geçmişi yok) birlikte alınma bilgisi olmadığından kurallar devreye girer (hedefin medyan sırası kurallarda 444, çok satanlarda 1.135). Sınırlama: az satan ürünlerde birlikte alınma sayıları küçük (1–2 sepet) ve gürültülü olabilir.
 
 Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan alınmıştır; ticari kullanımdan önce hak durumunu kontrol edin.
 

@@ -47,3 +47,5 @@ TAG_CACHE_PATH = CACHE_DIR / "tags.npz"
 
 # Kombin önerisi: görsellerin CLIP rol tahmini (fashion_rec/outfit.py)
 ROLE_CACHE_PATH = CACHE_DIR / "visual_roles.npz"
+# Birlikte alınma matrisi (scripts/build_copurchase.py; şimdilik yalnız H&M)
+COPURCHASE_PATH = CACHE_DIR / "copurchase.npz"

@@ -20,10 +20,11 @@ from collections import Counter  # noqa: E402
 from fashion_rec.catalog import display_name, load_metadata, majority_segment, metadata_tags, segments  # noqa: E402
 from fashion_rec.color import build_color_index  # noqa: E402
 from fashion_rec.config import IMAGE_BACKBONE, IMAGE_EXTENSIONS, ROLE_CACHE_PATH  # noqa: E402
+from fashion_rec.copurchase import PURCHASE_WEIGHTS, bought_together, load_copurchase  # noqa: E402
 from fashion_rec.data import catalog_index  # noqa: E402
 from fashion_rec.diversity import mmr  # noqa: E402
 from fashion_rec.glossary import translate  # noqa: E402
-from fashion_rec.outfit import OutfitCatalog, clip_roles, infer_row  # noqa: E402
+from fashion_rec.outfit import OutfitCatalog, Weights, clip_roles, infer_row  # noqa: E402
 from fashion_rec.segment_settings import load_settings, setting  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
 from fashion_rec.recommend import recommend  # noqa: E402
@@ -190,7 +191,8 @@ def get_outfit_catalog():
         return None
     clip_paths, clip_features = (paths, features) if IMAGE_BACKBONE == "clip" else get_text_index()
     roles = clip_roles(clip_paths, clip_features, ROLE_CACHE_PATH)
-    return OutfitCatalog(clip_paths, clip_features, get_metadata(), visual_roles=roles)
+    return OutfitCatalog(clip_paths, clip_features, get_metadata(), visual_roles=roles,
+                         copurchase=load_copurchase(clip_paths))
 
 
 SLOT_TITLES = {"üst": "Üst", "alt": "Alt", "ayakkabı": "Ayakkabı", "aksesuar": "Aksesuar"}
@@ -205,13 +207,20 @@ def show_outfit(image_path, uploaded):
     else:
         row = get_metadata().get(image_path.name, {})
         vector = query_vector(image_path, catalog.paths, catalog.features)
-    outfit = catalog.suggest(row, vector, per_slot=3, exclude=None if uploaded else image_path)
+    purchases = catalog.copurchase is not None
+    weights = PURCHASE_WEIGHTS if purchases else Weights()
+    outfit = catalog.suggest(row, vector, per_slot=3, weights=weights, exclude=None if uploaded else image_path)
     if not outfit:
         st.info("Bu ürün türü için kombin önerisi yok (kombin üst, alt, tek parça, ayakkabı ve aksesuarlar için).")
         return
-    st.caption("Aynı cinsiyet ve uyumlu kullanımdan (resmi, günlük, spor, etnik) parçalar; stil benzerliği, "
-               "renk uyumu ve mevsime göre sıralı. Veri setinde kombin bilgisi olmadığından kurallara dayalı bir "
-               "öneridir; desen uyumuna bakmaz." + (" Ürün türü komşulardan tahmin edildi." if uploaded else ""))
+    if purchases:
+        st.caption("Aynı cinsiyetten tamamlayıcı parçalar; müşterilerin bu ürünle aynı gün aldıkları parçalar öne "
+                   "çıkar (gerçek satın alma kayıtları), satış geçmişi olmayan ürünlerde stil benzerliği, renk "
+                   "uyumu ve çok satanlar kullanılır." + (" Ürün türü komşulardan tahmin edildi." if uploaded else ""))
+    else:
+        st.caption("Aynı cinsiyet ve uyumlu kullanımdan (resmi, günlük, spor, etnik) parçalar; stil benzerliği, "
+                   "renk uyumu ve mevsime göre sıralı. Veri setinde kombin bilgisi olmadığından kurallara dayalı bir "
+                   "öneridir; desen uyumuna bakmaz." + (" Ürün türü komşulardan tahmin edildi." if uploaded else ""))
     for slot, items in outfit.items():
         st.markdown(f"**{SLOT_TITLES.get(slot, slot)}**")
         for col, (path, _) in zip(st.columns(GRID_COLUMNS), items):
@@ -219,6 +228,26 @@ def show_outfit(image_path, uploaded):
                 st.image(str(path), width="stretch")
                 st.markdown(label(path))
                 st.caption(" · ".join(tag_lookup[path.name].values()))
+
+
+def show_bought_together(image_path, uploaded):
+    """Seçilen ürünle aynı sepette en sık alınan ürünler (satın alma kayıtları)."""
+    catalog = get_outfit_catalog()
+    if uploaded:
+        st.info("Birlikte alınanlar yalnızca katalogdaki ürünler için var (yüklenen görselin satış geçmişi yok).")
+        return
+    items = bought_together(image_path, catalog.paths, catalog.copurchase, get_metadata(), k=8)
+    if not items:
+        st.info("Bu ürünün satış geçmişinde birlikte alındığı bir ürün yok.")
+        return
+    st.caption("Müşterilerin bu ürünle aynı gün aldıkları ürünler (H&M satın alma kayıtları, 2018–2020). "
+               "Aynı ürünün başka renkleri gösterilmez.")
+    for start in range(0, len(items), GRID_COLUMNS):
+        for col, (path, count) in zip(st.columns(GRID_COLUMNS), items[start:start + GRID_COLUMNS]):
+            with col:
+                st.image(str(path), width="stretch")
+                st.markdown(label(path))
+                st.caption(" · ".join(tag_lookup[path.name].values()) + f"  \n{count} sepette birlikte alındı")
 
 
 def query_vector(image_path, index_paths, index_features):
@@ -358,8 +387,13 @@ else:
             if segment:
                 st.caption(f"Bölüm: **{segment}**" + ("" if isinstance(query_image, Path) else " (tahmin)"))
         with right:
-            similar_tab, outfit_tab = (st.tabs(["Benzer ürünler", "Kombin önerisi"]) if get_outfit_catalog()
-                                       else (st.container(), None))
+            catalog = get_outfit_catalog()
+            if catalog is None:
+                similar_tab, outfit_tab, bought_tab = st.container(), None, None
+            elif catalog.copurchase is not None:
+                similar_tab, outfit_tab, bought_tab = st.tabs(["Benzer ürünler", "Kombin önerisi", "Birlikte alınanlar"])
+            else:
+                (similar_tab, outfit_tab), bought_tab = st.tabs(["Benzer ürünler", "Kombin önerisi"]), None
             with similar_tab:
                 st.subheader(f"Öneriler: bunun gibi ama “{modifier}”" if modifier else "Öneriler")
                 if modifier and translate(modifier):
@@ -368,10 +402,12 @@ else:
                 scale = (get_combined_scale(text_weight, scale_segment) if modifier
                          else get_image_scale(color_weight, scale_segment))
                 show_grid(results, scale)
-            if outfit_tab is not None:
-                with outfit_tab:
+            for tab, show in ((outfit_tab, show_outfit), (bought_tab, show_bought_together)):
+                if tab is None:
+                    continue
+                with tab:
                     if isinstance(query_image, Path):
-                        show_outfit(query_image, uploaded=False)
+                        show(query_image, uploaded=False)
                     else:
                         with uploaded_file(query_image) as tmp_path:
-                            show_outfit(tmp_path, uploaded=True)
+                            show(tmp_path, uploaded=True)

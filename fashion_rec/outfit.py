@@ -107,9 +107,12 @@ SEASON_GROUP = {"Summer": "sıcak", "Spring": "sıcak", "Fall": "soğuk", "Winte
 
 @dataclass
 class Weights:
+    style: float = 1.0    # CLIP görsel stil benzerliği (yuva içi z-skoru) ile çarpılır
     usage: float = 1.0    # kullanım birebir aynıysa
     colour: float = 0.5   # renk uyumu puanı (-1 … +1) ile çarpılır
     season: float = 0.3   # aynı mevsim grubundaysa
+    copurchase: float = 0.0   # log(1 + birlikte alınma sayısı) ile çarpılır (satın alma verisi varsa)
+    popularity: float = 0.0   # log(1 + satış sepeti sayısı) ile çarpılır
 
 
 def role_of(row: dict[str, str]) -> str | None:
@@ -142,8 +145,14 @@ class OutfitCatalog:
     """Katalog etiketlerinin dizi hali; kombin önerisinde 44 bin ürünü her seferinde baştan okumamak için."""
 
     def __init__(self, paths: list[Path], features: np.ndarray, metadata: Metadata,
-                 visual_roles: np.ndarray | None = None):
+                 visual_roles: np.ndarray | None = None, copurchase=None):
+        """`copurchase`: (ürün × ürün) seyrek birlikte alınma sayıları, satırlar `paths` sırasıyla (bkz.
+        scripts/build_copurchase.py); yoksa yalnız kurallar kullanılır."""
         self.paths, self.features = paths, features
+        self.copurchase = copurchase.tocsr() if copurchase is not None else None
+        self.popularity = (np.log1p(np.asarray(self.copurchase.sum(axis=1)).ravel())
+                           if copurchase is not None else np.zeros(len(paths)))
+        self.index = {p: i for i, p in enumerate(paths)}
         rows = [metadata.get(p.name, {}) for p in paths]
         # adıyla çelişen (etiketi şüpheli) ürünler hiçbir yuvaya aday olmaz
         role = np.array(["" if name_conflicts(r) else role_of(r) or "" for r in rows])
@@ -156,41 +165,57 @@ class OutfitCatalog:
         self.colour = np.array([outfit_colour(r) for r in rows])
         self.season = np.array([SEASON_GROUP.get(r.get("season", ""), "") for r in rows])
 
+    def candidates(self, query_row: dict[str, str], slot: str, exclude: Path | None = None) -> np.ndarray:
+        """Yuvanın aday sıraları: yuva rolü + uygun cinsiyet + (varsa) uyumlu kullanım."""
+        gender = corrected_gender(query_row)
+        usage = query_row.get("usage", "") or "Casual"
+        if gender == "Unisex":
+            mask = np.isin(self.gender, ["Men", "Women", "Unisex"])
+        else:
+            mask = (self.gender == gender) | (self.gender == "Unisex")
+        mask &= self.role == slot
+        if exclude is not None and exclude in self.index:
+            mask[self.index[exclude]] = False
+        if slot == "aksesuar":  # aynı tür aksesuarı önerme (saate saat)
+            mask &= self.sub != query_row.get("subCategory", "")
+        matching = mask & np.isin(self.usage, list(USAGE_COMPATIBLE.get(usage, {usage})))
+        return np.flatnonzero(matching if matching.any() else mask)  # uyumlu aday yoksa kullanım şartı gevşer
+
+    def scores(self, query_row: dict[str, str], query_vector: np.ndarray, idx: np.ndarray,
+               weights: Weights = Weights(), query_path: Path | None = None) -> np.ndarray:
+        """Adayların puanı: stil (z) + kullanım + renk + mevsim [+ birlikte alınma + popülerlik]."""
+        usage = query_row.get("usage", "") or "Casual"
+        season = SEASON_GROUP.get(query_row.get("season", ""), "")
+        colour = outfit_colour(query_row)
+        score = weights.style * zscore(self.features[idx] @ query_vector)
+        score += weights.usage * (self.usage[idx] == usage)
+        score += weights.colour * np.array([colour_harmony(colour, c) for c in self.colour[idx]])
+        if season:
+            score += weights.season * (self.season[idx] == season)
+        if self.copurchase is not None and weights.copurchase and query_path in self.index:
+            row = self.copurchase[self.index[query_path]]
+            score += weights.copurchase * np.log1p(row[:, idx].toarray().ravel())
+        if weights.popularity:
+            score += weights.popularity * self.popularity[idx]
+        return score
+
     def suggest(self, query_row: dict[str, str], query_vector: np.ndarray, per_slot: int = 3,
                 weights: Weights = Weights(), exclude: Path | None = None) -> dict[str, list[tuple[Path, float]]]:
         """Yuva adı -> en iyi `per_slot` parça (yol, puan). Rolü olmayan ürün için boş sözlük.
 
         `query_row` ürünün etiketleri (katalog dışı görselde komşulardan tahmin,
-        bkz. `infer_row`); `query_vector` görselin CLIP vektörü.
+        bkz. `infer_row`); `query_vector` görselin CLIP vektörü; `exclude`
+        katalogdaki sorgu ürünü (birlikte alınma sinyali için de kullanılır).
         """
         role = role_of(query_row)
         if role is None:
             return {}
-        gender = corrected_gender(query_row)
-        usage = query_row.get("usage", "") or "Casual"
-        compatible = list(USAGE_COMPATIBLE.get(usage, {usage}))
-        season = SEASON_GROUP.get(query_row.get("season", ""), "")
-        colour = outfit_colour(query_row)
-        if gender == "Unisex":
-            gender_mask = np.isin(self.gender, ["Men", "Women", "Unisex"])
-        else:
-            gender_mask = (self.gender == gender) | (self.gender == "Unisex")
-        not_query = np.array([p != exclude for p in self.paths]) if exclude is not None else True
-
         outfit = {}
         for slot in SLOTS[role]:
-            mask = (self.role == slot) & gender_mask & not_query
-            if slot == "aksesuar":  # aynı tür aksesuarı önerme (saate saat)
-                mask &= self.sub != query_row.get("subCategory", "")
-            matching = mask & np.isin(self.usage, compatible)
-            idx = np.flatnonzero(matching if matching.any() else mask)  # uyumlu aday yoksa kullanım şartı gevşer
+            idx = self.candidates(query_row, slot, exclude)
             if not len(idx):
                 continue
-            score = zscore(self.features[idx] @ query_vector)
-            score += weights.usage * (self.usage[idx] == usage)
-            score += weights.colour * np.array([colour_harmony(colour, c) for c in self.colour[idx]])
-            if season:
-                score += weights.season * (self.season[idx] == season)
+            score = self.scores(query_row, query_vector, idx, weights, exclude)
             order = np.argsort(-score)
             ranked = [(self.paths[i], float(score[j])) for j, i in zip(order, idx[order])]
             # aynı modelin renkleri yuvayı doldurmasın
