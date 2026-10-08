@@ -1,6 +1,6 @@
 """Fashion Product Images veri setini proje formatına dönüştürür.
 
-    python scripts/import_products.py
+    python scripts/import_products.py [--keep-raw]
 
 Kaynak: Hugging Face `benitomartin/fashion-product-images-small-384x512`
 (Kaggle `paramaggarwal/fashion-product-images-small`, MIT; görseller Myntra'dan).
@@ -9,13 +9,15 @@ Kaynak: Hugging Face `benitomartin/fashion-product-images-small-384x512`
 `data/products/images/metadata.csv` dosyasına kaydeder. Var olan görseller
 yeniden yazılmaz; script tekrar çalıştırılabilir.
 
-İndirme:
-    for i in 0 1 2 3 4; do curl -L -o data/products/raw/train-0000$i-of-00005.parquet \\
-      https://huggingface.co/datasets/benitomartin/fashion-product-images-small-384x512/resolve/main/data/train-0000$i-of-00005.parquet; done
+Parquet dosyaları (5 × ~400 MB) yoksa kendisi indirir ve iş bitince siler
+(`--keep-raw` ile tutulur).
 """
 
+import argparse
 import csv
+import shutil
 import sys
+import urllib.request
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -23,6 +25,8 @@ import pyarrow.parquet as pq
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = PROJECT_ROOT / "data" / "products" / "raw"
 OUT_DIR = PROJECT_ROOT / "data" / "products" / "images"
+URL = ("https://huggingface.co/datasets/benitomartin/fashion-product-images-small-384x512/resolve/main/data/"
+       "train-0000{}-of-00005.parquet")
 COLUMNS = ["gender", "masterCategory", "subCategory", "articleType", "baseColour", "season", "year", "usage"]
 
 
@@ -35,10 +39,24 @@ def clean(value) -> str:
     return str(value).strip()
 
 
+def download() -> None:
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    for i in range(5):
+        target = RAW_DIR / f"train-0000{i}-of-00005.parquet"
+        if not target.exists():
+            print(f"indiriliyor: {target.name} (~400 MB)", flush=True)
+            urllib.request.urlretrieve(URL.format(i), target.with_suffix(".part"))
+            target.with_suffix(".part").rename(target)
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--keep-raw", action="store_true", help="indirilen parquet dosyalarını silme")
+    args = parser.parse_args()
+    download()
     files = sorted(RAW_DIR.glob("*.parquet"))
     if not files:
-        sys.exit(f"Hata: {RAW_DIR} altında parquet dosyası yok (indirme komutu için dosyanın başına bakın)")
+        sys.exit(f"Hata: {RAW_DIR} altında parquet dosyası yok")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     rows, written = [], 0
@@ -60,6 +78,8 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
     print(f"{len(rows)} ürün, {written} yeni görsel yazıldı → {OUT_DIR}")
+    if not args.keep_raw:
+        shutil.rmtree(RAW_DIR)  # görseller çıkarıldı; 2 GB'lık ham dosyalara gerek yok
 
 
 if __name__ == "__main__":

@@ -162,12 +162,17 @@ class OutfitCatalog:
         self.usage = np.array([r.get("usage", "") for r in rows])
         self.colour = np.array([outfit_colour(r) for r in rows])
         self.season = np.array([SEASON_GROUP.get(r.get("season", ""), "") for r in rows])
+        self.hidden = np.zeros(len(paths), dtype=bool)  # aday olmayacak ürünler (ör. kırpık fotoğraflılar)
+
+    def set_hidden(self, names: set[str]) -> None:
+        """Bu dosya adlarındaki ürünler kombin yuvalarına aday olmaz."""
+        self.hidden = np.array([p.name in names for p in self.paths])
 
     def candidates(self, query_row: dict[str, str], slot: str, exclude: Path | None = None) -> np.ndarray:
         """Yuvanın aday sıraları: yuva rolü + uygun cinsiyet + (varsa) uyumlu kullanım."""
         gender = corrected_gender(query_row)
         usage = query_row.get("usage", "") or "Casual"
-        mask = np.isin(self.gender, list(compatible_genders(gender))) & (self.role == slot)
+        mask = np.isin(self.gender, list(compatible_genders(gender))) & (self.role == slot) & ~self.hidden
         if exclude is not None and exclude in self.index:
             mask[self.index[exclude]] = False
         if slot == "aksesuar":  # aynı tür aksesuarı önerme (saate saat)

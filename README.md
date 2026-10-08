@@ -31,11 +31,34 @@ Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yükl
 
 **Otomatik etiketler**: CLIP her görsele bir renk (siyah, beyaz, kırmızı, mavi, yeşil, pembe, sarı, mor, bej / kahverengi, gri / gümüş) ve bir tür (elbise, etnik, pantolonlu, etekli, ceket / üst) etiketi verir. Bunu, görselin vektörünü her etiketin tarif metniyle karşılaştırarak yapar; buna sıfır örnekli sınıflandırma denir. Dosya adlarıyla ölçülen doğruluk renkte %87, türde %85'tir. Etiketler `tags.npz` dosyasına önbelleklenir; etiket listesi veya model değişince yeniden hesaplanır.
 
-**Benzerlik yüzdesi** (arayüz): ham skorlar (cosine ya da z-skoru toplamı) yönteme göre farklı aralıklardadır ve doğrudan yüzde değildir; CLIP'te metin–görsel benzerliği 0,30 çok iyi bir eşleşmedir. Arayüz bu yüzden skoru, aynı yöntemle yapılan örnek aramaların **ilk 10 sonucundan** oluşan bir referans dağılımla karşılaştırır (`fashion_rec/calibration.py`): %80, tipik en iyi eşleşmelerin %80'inden daha benzer demektir. Yalnızca en iyi eşleşmelerin kullanılması yüzdeyi katalog büyüklüğünden bağımsız kılar (tüm çiftlerle kıyaslansaydı 44 bin üründe her sonuç %99,9 görünürdü): iki veri setinde de tipik bir sorgunun 1. sonucu medyanda %72–78, 4. sonucu %45–53 alır. Anlamsız sorgular %0'a yakın kalır ("uçak" → %0). Komut satırı ham skoru gösterir.
+**Benzerlik yüzdesi** (arayüz): ham skorlar (cosine ya da z-skoru toplamı) yönteme göre farklı aralıklardadır ve doğrudan yüzde değildir; CLIP'te metin–görsel benzerliği 0,30 çok iyi bir eşleşmedir. Arayüz bu yüzden skoru, aynı yöntemle yapılan örnek aramaların **ilk 10 sonucundan** oluşan bir referans dağılımla karşılaştırır (`fashion_rec/calibration.py`): %80, tipik en iyi eşleşmelerin %80'inden daha benzer demektir. Yalnızca en iyi eşleşmelerin kullanılması yüzdeyi katalog büyüklüğünden bağımsız kılar (tüm çiftlerle kıyaslansaydı 44 bin üründe her sonuç %99,9 görünürdü): iki veri setinde de tipik bir sorgunun 1. sonucu medyanda %72–78, 4. sonucu %45–53 alır. Anlamsız sorgular %0'a yakın kalır ("uçak" → %0). Metin aramasında referans, genel tarifler ("a black outfit") ile katalogdan kurulan sorguların ("women black bag") eşit karışımıdır: CLIP'te bir sorgunun ham skoru ifadesine çok bağlı olduğundan tek tür referans ya %100'e doyuyor ya da doğru sonuçları %0–20 gösteriyordu. Komut satırı ham skoru gösterir.
 
 Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı. Metinden aramada çok dilli model, 20 Türkçe sorgunun 19'unda doğru kıyafeti ilk 3'e getirdi (OpenAI CLIP: 3/20). Ayrıntılar `PROJE.md` ve `notebooks/` altında.
 
 ## Kurulum
+
+### Docker ile (önerilen)
+
+[Docker](https://docs.docker.com/get-docker/) yeterli; Python kurmaya gerek yok.
+
+```bash
+git clone <depo adresi> && cd fashion-recommender
+docker compose build                                         # ilk derleme ~10 dk, imaj ~4 GB
+docker compose run --rm app python scripts/setup_data.py hm  # veri setini indir ve hazırla (aşağıya bakın)
+docker compose up                                            # http://localhost:8501
+```
+
+Kadın veri seti (93 görsel) depoda gelir, hiçbir şey indirmeden `docker compose up` ile açılır. Diğer veri setleri `setup_data.py` ile kullanıcının kendi bilgisayarına kaynağından indirilir; görseller imaja ya da depoya konmaz (H&M ve Myntra görsellerinin hakları markalara aittir, yeniden dağıtılmamalıdır):
+
+| komut | indirme / disk | süre (Docker'da işlemci ile) |
+|---|---|---|
+| `python scripts/setup_data.py women` | — | ~1 dk |
+| `python scripts/setup_data.py hm` | ~1 GB indirme, ~650 MB disk | ~1 saat indirme + ~15–20 dk vektörler |
+| `python scripts/setup_data.py products` | ~2 GB indirme, ~2,5 GB disk | ~10 dk indirme + ~30 dk vektörler |
+
+Doğrulandı (Apple Silicon, Colima ile Docker): imaj ~7 dk'da derlenir (4,4 GB), testler konteynerde geçer, uygulama H&M verisiyle açılır; ilk metin aramasında CLIP ağırlıkları (1,4 GB) iner (~3 dk). `data/`, `cache/` klasörleri ve model ağırlıkları (`models` birimi) kalıcıdır; konteyner silinse de yeniden inmez. Docker'da ekran kartı kullanılmaz, CLIP vektörleri işlemcide hesaplanır (Mac'te yerel kurulumda Apple GPU ile ~5 kat hızlı).
+
+### Yerel kurulum
 
 Python 3.11 gerekir. Örnek (conda):
 
@@ -46,6 +69,8 @@ pip install -r requirements.txt
 ```
 
 İlk çalıştırmada VGG16 ağırlıkları (~60 MB) Keras tarafından, CLIP ağırlıkları (~1,5 GB) Hugging Face'ten otomatik indirilir. TensorFlow ve PyTorch birlikte kurulduğu için ortam ~3 GB yer kaplar.
+
+Veri setlerini hazırlamak için Docker'daki gibi `python scripts/setup_data.py women | products | hm`.
 
 ## Kullanım
 
@@ -189,7 +214,8 @@ fashion-recommender/
 │   ├── segment_settings.py   # bölüm bazında ayarlar
 │   └── segment_settings.json # scripts/tune_segments.py çıktısı
 ├── app.py                # Streamlit arayüzü
-├── scripts/              # veri seti içe aktarma
+├── scripts/              # veri seti hazırlama (setup_data.py), içe aktarma, ayar / eğitim scriptleri
+├── Dockerfile, docker-compose.yml
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları
 ├── docs/                 # README görselleri

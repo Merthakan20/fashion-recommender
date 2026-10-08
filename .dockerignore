@@ -1,0 +1,12 @@
+# veri setleri ve önbellekler imaja girmez (docker-compose.yml'de birim olarak bağlanır)
+data/products/
+data/hm/
+cache/
+notebooks/products_eval_cache.npz
+.git/
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store

@@ -17,8 +17,8 @@ from fashion_rec.backbone import build_image_index, clip_encoder  # noqa: E402
 from fashion_rec.calibration import combined_scale, image_scale, text_scale  # noqa: E402
 from collections import Counter  # noqa: E402
 
-from fashion_rec.catalog import (compatible_segments, display_name, load_metadata, majority_segment,  # noqa: E402
-                                 metadata_tags, segments)
+from fashion_rec.catalog import (compatible_segments, corrected_gender, display_name, load_metadata,  # noqa: E402
+                                 majority_segment, metadata_tags, segments)
 from fashion_rec.color import build_color_index  # noqa: E402
 from fashion_rec import config  # noqa: E402
 from fashion_rec.config import IMAGE_EXTENSIONS  # noqa: E402
@@ -27,13 +27,14 @@ from fashion_rec.data import catalog_index  # noqa: E402
 from fashion_rec.diversity import mmr  # noqa: E402
 from fashion_rec.glossary import gender_in_query, translate  # noqa: E402
 from fashion_rec.outfit import OutfitCatalog, Weights, clip_roles, infer_row  # noqa: E402
+from fashion_rec.photo import build_photo_index, partial_names  # noqa: E402
 from fashion_rec.segment_settings import load_settings, setting  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
 from fashion_rec.recommend import recommend  # noqa: E402
 from fashion_rec.tags import TAG_GROUPS, build_tag_index, filter_results, tags_by_name  # noqa: E402
 from fashion_rec.text_search import build_text_index, combined_search, load_clip_model, search  # noqa: E402
 
-GRID_COLUMNS = 4
+GRID_COLUMNS = 3  # 4 sütunda kartlar ~165 px genişliğe sıkışıp görseller küçük kalıyordu
 
 
 @st.cache_resource(show_spinner="Görsel özellikleri hazırlanıyor...")
@@ -117,10 +118,27 @@ def get_image_scale(color_weight, segment=None):
     return image_scale(paths, features, color_features=color_features, color_weight=color_weight, subset=subset)
 
 
+GENDER_WORDS = {"Women": "women", "Men": "men", "Girls": "girls", "Boys": "boys", "Kids": "kids"}
+
+
 @st.cache_resource(show_spinner="Benzerlik ölçeği hazırlanıyor...")
 def get_text_scale():
+    """Metin araması yüzde ölçeği; referans iki tür tarifin en iyi eşleşmelerinden eşit ölçüde oluşur.
+
+    CLIP'te bir sorgunun ham skoru ifadesine çok bağlı olduğundan tek tür referans kırılgan çıktı:
+    yalnız genel tarifler ("a black outfit") net sorgularda %100'e doyuyordu, yalnız katalogdan kurulan
+    sorgular ("women black tshirt" — binlerce benzer ürünle çok yüksek eşleşir) çıtayı fazla yükseltip
+    doğru sonuçları %0–20 gösteriyordu. İkisi birlikte (15 + 15) iki ucun ortası gibi davranır.
+    """
     text_paths, text_features = get_text_index()
-    return text_scale(text_paths, text_features, get_clip_model(), REFERENCE_QUERIES)
+    metadata = get_metadata()
+    queries = REFERENCE_QUERIES
+    if metadata:
+        combos = Counter((GENDER_WORDS.get(corrected_gender(r), ""), r.get("baseColour", "").lower(),
+                          r.get("articleType", "").lower()) for r in metadata.values())
+        catalog_queries = [" ".join(w for w in combo if w) for combo, _ in combos.most_common(40) if combo[2]]
+        queries = REFERENCE_QUERIES[:15] + catalog_queries[:15]
+    return text_scale(text_paths, text_features, get_clip_model(), queries)
 
 
 @st.cache_resource(show_spinner="Benzerlik ölçeği hazırlanıyor...")
@@ -211,6 +229,7 @@ def show_outfit(image_path, uploaded):
         vector = query_vector(image_path, catalog.paths, catalog.features)
     purchases = catalog.copurchase is not None
     weights = PURCHASE_WEIGHTS if purchases else Weights()
+    catalog.set_hidden(get_partial_names() if hide_partial else set())
     outfit = catalog.suggest(row, vector, per_slot=3, weights=weights, exclude=None if uploaded else image_path)
     if not outfit:
         st.info("Bu ürün türü için kombin önerisi yok (kombin üst, alt, tek parça, ayakkabı ve aksesuarlar için).")
@@ -238,7 +257,7 @@ def show_bought_together(image_path, uploaded):
     if uploaded:
         st.info("Birlikte alınanlar yalnızca katalogdaki ürünler için var (yüklenen görselin satış geçmişi yok).")
         return
-    items = bought_together(image_path, catalog.paths, catalog.copurchase, get_metadata(), k=8)
+    items = visible(bought_together(image_path, catalog.paths, catalog.copurchase, get_metadata(), k=16))[:8]
     if not items:
         st.info("Bu ürünün satış geçmişinde birlikte alındığı bir ürün yok.")
         return
@@ -258,6 +277,20 @@ def query_vector(image_path, index_paths, index_features):
     return index_features[row] if row is not None else None
 
 
+@st.cache_resource(show_spinner="Fotoğraflar kontrol ediliyor...")
+def get_partial_names():
+    """Ürünü tam göstermeyen (kırpık / yakın çekim) fotoğraflı ürünler (fashion_rec/photo.py)."""
+    return partial_names(paths, build_photo_index(paths))
+
+
+def visible(results):
+    """Kırpık / yakın çekim fotoğrafları gizleme açıksa onları çıkarır."""
+    if not hide_partial:
+        return results
+    hidden = get_partial_names()
+    return [r for r in results if r[0].name not in hidden]
+
+
 def refine(results, segment=None, index=None, query_vec=None):
     """Bölüm kısıtlaması + etiket filtreleri, sonra çeşitlilik (MMR) ile ilk `top_n` sonuç.
 
@@ -265,7 +298,7 @@ def refine(results, segment=None, index=None, query_vec=None):
     """
     if segment and same_segment:
         results = [(p, s) for p, s in results if segment_lookup.get(p.name) in compatible_segments(segment)]
-    filtered = filter_results(results, tag_lookup, selected_tags)
+    filtered = filter_results(visible(results), tag_lookup, selected_tags)
     if results and not filtered:
         st.warning("Seçili filtrelere uyan sonuç yok.")
     index_paths, index_features = index or (paths, features)
@@ -293,13 +326,29 @@ def show_grid(results, scale):
 
 
 st.set_page_config(page_title="Fashion Recommender", page_icon="👗", layout="wide")
+# Görseller sütun genişliğini dolduran 2:3 kutularda, oranı korunarak ve kırpılmadan (object-fit: contain):
+# sabit piksel yükseklik geniş ekranda görselleri küçük bırakıyordu, farklı en-boy oranları da kartları farklı
+# boylarda; ekran yüksekliğine göre üst sınır, uzun görsellerin ekrandan taşmasını önler
+st.markdown("""
+<style>
+[data-testid="stImage"] img {
+    width: 100% !important; height: auto !important; aspect-ratio: 2 / 3; max-height: 62vh;
+    object-fit: contain; background: #f5f5f5; border-radius: 6px;
+}
+.st-key-selected [data-testid="stImage"] img { max-height: 80vh; }
+/* Streamlit görselin çevresindeki kutuları görselin asıl genişliğine (341 px) daraltıyor; sütuna yay */
+[data-testid="stFullScreenFrame"] > div, [data-testid="stImage"], [data-testid="stImageContainer"] {
+    width: 100% !important;
+}
+</style>
+""", unsafe_allow_html=True)
 st.title("👗 Fashion Recommender")
 st.caption("Bir kıyafet seçin, yükleyin veya tarif edin; en çok benzeyen kıyafetleri önerelim.")
 
 # Veri seti seçici: değişince yalnız veri setine bağlı önbellekler temizlenir (CLIP / VGG16 modelleri kalır)
 DATASET_CACHES = [get_index, get_metadata, get_tag_lookup, get_filter_options, get_segment_lookup,
                   get_color_features, get_text_index, get_image_scale, get_text_scale, get_combined_scale,
-                  get_outfit_catalog]
+                  get_outfit_catalog, get_partial_names]
 datasets = config.available_datasets()
 with st.sidebar:
     chosen = st.selectbox("Veri seti", datasets, index=datasets.index(config.DATASET) if config.DATASET in datasets else 0,
@@ -317,11 +366,15 @@ segment_settings = load_settings()
 with st.sidebar:
     st.header("Ayarlar")
     source = st.radio("Arama şekli", ["Veri setinden seç", "Görsel yükle", "Metinle ara"])
-    top_n = st.slider("Öneri sayısı", min_value=1, max_value=12, value=GRID_COLUMNS)
+    top_n = st.slider("Öneri sayısı", min_value=1, max_value=12, value=2 * GRID_COLUMNS)
     same_segment = bool(segment_lookup) and st.toggle(
         "Aynı bölümden öner", value=True,
         help="Öneriler seçilen ürünün bölümünden (Kadın / Erkek / Kız Çocuk / Erkek Çocuk / Aksesuar) gelir. "
              "Kapalıyken çocuk ürünlerine gelen önerilerin ~%25'i yetişkin ürünüdür.")
+    hide_partial = st.toggle(
+        "Kırpık fotoğrafları gizle", value=True,
+        help="Ürünü tam göstermeyen fotoğrafları (yalnız topuğu görünen ayakkabı, kumaş yakın çekimi…) önerilerde "
+             "gösterme. Veri setinde her ürünün tek fotoğrafı var; bunlar görsellerin ~%3'ü.")
     diversity = st.slider(
         "Çeşitlilik", 0.0, 0.6, 0.2, 0.1,
         help="Neredeyse aynı ürünlerin (aynı ürünün başka ilanı, aynı modelin renkleri) önerileri doldurmasını "
@@ -401,12 +454,14 @@ else:
                     results = refine(find_similar(tmp_path, modifier, len(paths), text_weight, color_weight),
                                      segment, index)
 
-        left, right = st.columns([1, 3], gap="large")
-        with left:
+        left, right = st.columns([1.4, 3], gap="large")
+        with left, st.container(key="selected"):  # "selected" anahtarı CSS'te büyük gösterim için
             st.subheader("Seçilen")
             st.image(query_image if not isinstance(query_image, Path) else str(query_image), width="stretch")
             if segment:
                 st.caption(f"Bölüm: **{segment}**" + ("" if isinstance(query_image, Path) else " (tahmin)"))
+            if isinstance(query_image, Path) and query_image.name in get_partial_names():
+                st.caption("Bu ürünün veri setindeki tek fotoğrafı ürünü tam göstermiyor (kırpık / yakın çekim).")
         with right:
             catalog = get_outfit_catalog()
             if catalog is None:

@@ -37,9 +37,13 @@ COLOR_CROP = (0.25, 0.15, 0.75, 0.85)  # kıyafetin çoğunlukla durduğu orta b
 
 
 def available_datasets() -> list[str]:
-    """Görselleri indirilmiş veri setleri (kadın veri seti git'te, diğerleri metadata.csv ile)."""
-    return [name for name, path in DATASETS.items()
-            if path.is_dir() and (name == "women" or (path / METADATA_FILE).exists())]
+    """Arayüzde seçilebilecek veri setleri: indirilmiş olanlar (metadata.csv ile).
+
+    93 görsellik kadın veri seti yalnızca başka veri seti indirilmemişse (yeni kurulum) listelenir;
+    git'te olduğu için yedek olarak kalır.
+    """
+    downloaded = [name for name, path in DATASETS.items() if name != "women" and (path / METADATA_FILE).exists()]
+    return downloaded or ["women"]
 
 
 def set_dataset(name: str) -> None:
@@ -47,7 +51,7 @@ def set_dataset(name: str) -> None:
     if name not in DATASETS:
         raise ValueError(f"Bilinmeyen veri seti: {name!r} (seçenekler: {', '.join(DATASETS)})")
     global DATASET, DATA_DIR, IMAGE_BACKBONE, CACHE_DIR, CACHE_PATH, CLIP_CACHE_PATH, CLIP_ADAPTER_PATH
-    global COLOR_CACHE_PATH, TAG_CACHE_PATH, ROLE_CACHE_PATH, COPURCHASE_PATH
+    global COLOR_CACHE_PATH, TAG_CACHE_PATH, ROLE_CACHE_PATH, COPURCHASE_PATH, PHOTO_CACHE_PATH
     DATASET, DATA_DIR, IMAGE_BACKBONE = name, DATASETS[name], IMAGE_BACKBONES[name]
     # önbellekler veri setine özel: veri setleri arasında geçiş yapınca yeniden hesaplanmaz
     CACHE_DIR = PROJECT_ROOT / "cache" / name
@@ -58,8 +62,9 @@ def set_dataset(name: str) -> None:
     TAG_CACHE_PATH = CACHE_DIR / "tags.npz"                 # CLIP otomatik etiketleri (notebooks/compare_tags.py)
     ROLE_CACHE_PATH = CACHE_DIR / "visual_roles.npz"        # kombin önerisi: görsellerin CLIP rol tahmini
     COPURCHASE_PATH = CACHE_DIR / "copurchase.npz"          # birlikte alınma (scripts/build_copurchase.py)
+    PHOTO_CACHE_PATH = CACHE_DIR / "photo_border.npz"       # kırpık / yakın çekim fotoğraf tespiti (photo.py)
 
 
-# başlangıç: FASHION_DATASET, yoksa 44 bin ürünlük veri seti indirilmişse o, değilse git'teki kadın veri seti
+# başlangıç: FASHION_DATASET, yoksa indirilmiş ilk veri seti (H&M öncelikli), hiçbiri yoksa git'teki kadın veri seti
 set_dataset(os.environ.get("FASHION_DATASET")
-            or ("products" if (DATASETS["products"] / METADATA_FILE).exists() else "women"))
+            or next((d for d in ("hm", "products") if (DATASETS[d] / METADATA_FILE).exists()), "women"))

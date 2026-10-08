@@ -29,3 +29,15 @@ def test_functions_read_dataset_at_call_time(data_dir, monkeypatch):
 def test_unknown_dataset_is_rejected():
     with pytest.raises(ValueError):
         config.set_dataset("zara")
+
+
+def test_women_dataset_only_listed_when_nothing_else_is_downloaded(tmp_path, monkeypatch):
+    empty = tmp_path / "yok"
+    monkeypatch.setitem(config.DATASETS, "hm", empty)
+    monkeypatch.setitem(config.DATASETS, "products", empty)
+    assert config.available_datasets() == ["women"]
+    hm = tmp_path / "hm"
+    hm.mkdir()
+    (hm / config.METADATA_FILE).write_text("file,name\n")
+    monkeypatch.setitem(config.DATASETS, "hm", hm)
+    assert config.available_datasets() == ["hm"]

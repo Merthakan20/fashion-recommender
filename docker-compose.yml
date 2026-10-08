@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    image: fashion-recommender
+    ports:
+      - "8501:8501"
+    environment:
+      # açılışta gösterilecek veri seti (women | products | hm); boşsa indirilmiş olana göre seçilir
+      - FASHION_DATASET=${FASHION_DATASET:-}
+    volumes:
+      # veri setleri ve önbellekler konteyner silinse de kalır; yerel kurulumla aynı klasörler
+      - ./data/products:/app/data/products
+      - ./data/hm:/app/data/hm
+      - ./cache:/app/cache
+      - models:/models
+
+volumes:
+  models:
