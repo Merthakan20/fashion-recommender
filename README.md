@@ -1,350 +1,108 @@
 # 👗 Fashion Recommender
 
-Görsel benzerliğine dayalı kıyafet öneri sistemi. Bir kıyafet görseli verildiğinde, veri setindeki görsel olarak en çok benzeyen kıyafetleri önerir. Kıyafeti Türkçe veya İngilizce tarif ederek de arama yapılabilir (ör. *kırmızı payetli elbise*). İkisi birleştirilebilir: bir kıyafet seçip "bunun gibi ama kırmızı" diye aranabilir. Sonuçlar otomatik renk ve tür etiketleriyle filtrelenebilir.
+**Visual fashion search and recommendations with multilingual CLIP, real purchase data and honest evaluation.**
+Pick a product, upload a photo or describe what you want (in Turkish or English) — get visually similar items, complete outfits and "frequently bought together" suggestions.
 
-Üç şekilde kullanılabilir:
+> **🇹🇷 Türkçe özet:** Görsel benzerliğe dayalı bir moda öneri sistemi. Bir ürün seçin, fotoğraf yükleyin ya da Türkçe/İngilizce tarif edin; benzer ürünler, kombin önerileri ve "birlikte alınanlar" gelir. Çok dilli CLIP, Türkçe moda sözlüğü, bölüm bazında (Kadın / Erkek / Çocuk / Aksesuar) ayarlar, H&M'in gerçek satın alma kayıtlarından öğrenilen kombinler ve BigQuery veri kaynağı içerir. Her karar gerçek etiketler ya da satın alma verisiyle ölçüldü. Ayrıntılı Türkçe belge: [README.tr.md](README.tr.md), geliştirme günlüğü: [PROJE.md](PROJE.md).
 
-- **Python paketi** — `fashion_rec`
-- **Komut satırı (CLI)** — `python -m fashion_rec ...`
-- **Web arayüzü** — Streamlit
+| Similar products | Outfit suggestions |
+|---|---|
+| ![Similar products](docs/screenshot_similar.png) | ![Outfit suggestions](docs/screenshot_outfit.png) |
+| **Frequently bought together** | **Text search in Turkish** |
+| ![Bought together](docs/screenshot_bought_together.png) | ![Text search](docs/screenshot_text_search.png) |
 
-![Görselden öneri](docs/screenshot.png)
+## Features
 
-![Metinden arama](docs/text_search.png)
+- **Search three ways** — pick a catalogue item, upload a photo, or type a description ("kırmızı payetli elbise", "black lace dress").
+- **"Like this, but red"** — combine an image with a text modifier.
+- **Outfit suggestions** — complementary pieces (top → bottom + shoes + accessory), learned from real H&M purchases and backed by rules for new products.
+- **Frequently bought together** — from 1M+ shopping baskets.
+- **Segments** — Women / Men / Girls / Boys / Accessories, each with its own tuned settings; recommendations stay in the query's segment.
+- **Turkish support** — a fashion glossary fixes CLIP's Turkish vocabulary gaps ("kemer" → belt).
+- **Quality controls** — diversity re-ranking (no near-duplicate listings), hides products whose only photo is a cropped close-up, similarity shown as a calibrated percentage.
+- **Data sources** — Fashion Product Images (44k), H&M (26k + purchases), or your own **BigQuery** catalogue (read-only, cost-guarded).
+- **Ships as Docker** — one command to build, one to prepare a dataset, one to run.
 
-![Görsel + metin: bunun gibi ama kırmızı](docs/combined_search.png)
+## How it works
 
-## Nasıl çalışır
-
-1. `data/women fashion/` altındaki görseller listelenir (`.jpg`, `.jpeg`, `.png`, `.webp`).
-2. ImageNet üzerinde önceden eğitilmiş **VGG16** ile her görselden bir özellik vektörü (25.088 boyut) çıkarılır ve L2 ile normalize edilir.
-3. Vektörler `features.npz` dosyasına önbelleklenir. Görsel listesi değişince otomatik olarak yeniden hesaplanır.
-4. Girdi görselinin vektörü tüm vektörlerle çarpılır (normalize vektörlerde nokta çarpımı = cosine benzerliği) ve en yüksek skorlu N görsel döner. Girdi görseli veri setindeyse sonuçlardan çıkarılır.
-
-Veri setindeki bir görsel için vektör önbellekten alınır, model hiç yüklenmez. Model yalnızca veri setinde olmayan bir görsel geldiğinde açılır.
-
-**Metinden arama** için çok dilli bir [CLIP](https://github.com/mlfoundations/open_clip) modeli (`xlm-roberta-base-ViT-B-32`, LAION-5B) kullanılır: görseller ve arama metni aynı vektör uzayına kodlanır, en yüksek cosine benzerliğine sahip görseller döner. Metin Türkçe veya İngilizce (ve diğer pek çok dilde) yazılabilir. CLIP vektörleri ayrı bir önbellekte (`clip_features.npz`) tutulur; önbellek modeli de kaydeder, model değişince otomatik yeniden hesaplanır.
-
-**Görsel + metin birlikte arama** ("bunun gibi ama kırmızı") yine CLIP ile yapılır. Her görsel için hem sorgu görseline hem değişiklik metnine olan benzerlik hesaplanır. İki benzerlik farklı ölçeklerde olduğundan (görsel–görsel ≈0,5–0,9, görsel–metin ≈0,15–0,3) ikisi de z-skoruna çevrilir ve metin ağırlığıyla toplanır (0 = yalnız görsel, 1 = yalnız metin, varsayılan 0,5). 14 örneklik bir testte doğru kıyafet 12'sinde ilk 3'e girdi (yalnız görsel: 4, yalnız metin: 8).
-
-**Renk önemi** (isteğe bağlı, varsayılan 0): VGG16 doku ve stile bakar, renge pek bakmaz. Renk önemi açılınca her görselin orta bölgesinden (arka planın etkisini azaltmak için) bir HSV renk histogramı çıkarılır ve VGG16 benzerliğiyle yine z-skoru + ağırlıkla birleştirilir. Ödünleşim vardır: 0,4'te renk tutarlılığı 0,17 → 0,26 artarken etnik/stil tutarlılığı 0,51 → 0,31 düşer. Bazı sorgularda belirgin iyileşme sağlar ("sparkling black dress" → siyah payetli elbiseler), arka planı geniş fotoğraflarda ise yanılabilir.
-
-**Otomatik etiketler**: CLIP her görsele bir renk (siyah, beyaz, kırmızı, mavi, yeşil, pembe, sarı, mor, bej / kahverengi, gri / gümüş) ve bir tür (elbise, etnik, pantolonlu, etekli, ceket / üst) etiketi verir. Bunu, görselin vektörünü her etiketin tarif metniyle karşılaştırarak yapar; buna sıfır örnekli sınıflandırma denir. Dosya adlarıyla ölçülen doğruluk renkte %87, türde %85'tir. Etiketler `tags.npz` dosyasına önbelleklenir; etiket listesi veya model değişince yeniden hesaplanır.
-
-**Benzerlik yüzdesi** (arayüz): ham skorlar (cosine ya da z-skoru toplamı) yönteme göre farklı aralıklardadır ve doğrudan yüzde değildir; CLIP'te metin–görsel benzerliği 0,30 çok iyi bir eşleşmedir. Arayüz bu yüzden skoru, aynı yöntemle yapılan örnek aramaların **ilk 10 sonucundan** oluşan bir referans dağılımla karşılaştırır (`fashion_rec/calibration.py`): %80, tipik en iyi eşleşmelerin %80'inden daha benzer demektir. Yalnızca en iyi eşleşmelerin kullanılması yüzdeyi katalog büyüklüğünden bağımsız kılar (tüm çiftlerle kıyaslansaydı 44 bin üründe her sonuç %99,9 görünürdü): iki veri setinde de tipik bir sorgunun 1. sonucu medyanda %72–78, 4. sonucu %45–53 alır. Anlamsız sorgular %0'a yakın kalır ("uçak" → %0). Metin aramasında referans, genel tarifler ("a black outfit") ile katalogdan kurulan sorguların ("women black bag") eşit karışımıdır: CLIP'te bir sorgunun ham skoru ifadesine çok bağlı olduğundan tek tür referans ya %100'e doyuyor ya da doğru sonuçları %0–20 gösteriyordu. Komut satırı ham skoru gösterir.
-
-Görselden görsele öneride VGG16 ile CLIP karşılaştırıldı ve belirgin bir kazanan çıkmadı. Metinden aramada çok dilli model, 20 Türkçe sorgunun 19'unda doğru kıyafeti ilk 3'e getirdi (OpenAI CLIP: 3/20). Ayrıntılar `PROJE.md` ve `notebooks/` altında.
-
-## Kurulum
-
-### Docker ile (önerilen)
-
-[Docker](https://docs.docker.com/get-docker/) yeterli; Python kurmaya gerek yok.
-
-```bash
-git clone <depo adresi> && cd fashion-recommender
-docker compose build                                         # ilk derleme ~10 dk, imaj ~4 GB
-docker compose run --rm app python scripts/setup_data.py hm  # veri setini indir ve hazırla (aşağıya bakın)
-docker compose up                                            # http://localhost:8501
+```
+image / text ──► multilingual CLIP (xlm-roberta-base ViT-B/32) ──► 512-d embedding
+                    ▲ Turkish glossary for queries
+catalogue ──► embeddings (cached) ──► cosine similarity ──► segment & tag filters
+                                                         ──► MMR diversity, cropped-photo filter
+                                                         ──► calibrated "similarity %"
+outfits ──► complementary slots × (co-purchase + popularity + style + colour/usage rules)
+purchases ──► baskets (customer × day) ──► sparse co-purchase matrix
 ```
 
-Kadın veri seti (93 görsel) depoda gelir, hiçbir şey indirmeden `docker compose up` ile açılır. Diğer veri setleri `setup_data.py` ile kullanıcının kendi bilgisayarına kaynağından indirilir; görseller imaja ya da depoya konmaz (H&M ve Myntra görsellerinin hakları markalara aittir, yeniden dağıtılmamalıdır):
+## Results — every decision was measured
 
-| komut | indirme / disk | süre (Docker'da işlemci ile) |
-|---|---|---|
-| `python scripts/setup_data.py women` | — | ~1 dk |
-| `python scripts/setup_data.py hm` | ~1 GB indirme, ~650 MB disk | ~1 saat indirme + ~15–20 dk vektörler |
-| `python scripts/setup_data.py products` | ~2 GB indirme, ~2,5 GB disk | ~10 dk indirme + ~30 dk vektörler |
+| Question | Finding |
+|---|---|
+| Which image model? (44k products, labelled eval, precision@5) | **CLIP** beats VGG16 on article type (0.810 vs 0.755), colour (0.334 vs 0.266) and gender (0.874 vs 0.837) |
+| Does a Turkish glossary help? (30 held-out Turkish queries, written *before* the glossary) | top-10 hit rate **0.68 → 0.83** |
+| Does fine-tuning CLIP help? (linear adapter, held-out 20%) | only +1–2 points and hurts Turkish on validation → **not used** |
+| Are hand-made outfit rules good? (H&M, train on old baskets, test on the last 3 months) | rules **0.026** < best-sellers 0.043 < co-purchase **0.087** (top-10 hit rate) |
+| Same-segment recommendations? | gender precision for kids **0.85 → 1.00** |
+| Diversity re-ranking (MMR) | queries with near-duplicate results **14% → 9%** for a 1-point precision cost |
 
-Doğrulandı (Apple Silicon, Colima ile Docker): imaj ~7 dk'da derlenir (4,4 GB), testler konteynerde geçer, uygulama H&M verisiyle açılır; ilk metin aramasında CLIP ağırlıkları (1,4 GB) iner (~3 dk). `data/`, `cache/` klasörleri ve model ağırlıkları (`models` birimi) kalıcıdır; konteyner silinse de yeniden inmez. Docker'da ekran kartı kullanılmaz, CLIP vektörleri işlemcide hesaplanır (Mac'te yerel kurulumda Apple GPU ile ~5 kat hızlı).
+### Lessons learned
 
-### Yerel kurulum
+- **Measure against real behaviour.** Outfit rules that looked convincing by eye predicted real purchases worse than simply recommending best-sellers; co-purchase data was 5× better for products with history.
+- **The bottleneck isn't always the model.** Turkish search failed because CLIP didn't know words like "kemer" — a 200-term glossary beat model fine-tuning by a wide margin.
+- **Evaluation code needs tests too.** Counting ties in the target's favour made popularity look better than it was; a typo in a label hid a working query.
+- **Data has bugs.** ~23% of kids items were labelled as adult, some product photos showed a different product, and 3% of photos are cropped close-ups — each found by looking, then fixed with a measurable rule.
 
-Python 3.11 gerekir. Örnek (conda):
+## Quick start
+
+### Docker
 
 ```bash
-conda create -n fashion-rec python=3.11
-conda activate fashion-rec
+docker compose build                                          # ~7 min, 4.4 GB image
+docker compose run --rm app python scripts/setup_data.py hm   # download & prepare H&M (~1 h)
+docker compose up                                             # http://localhost:8501
+```
+
+### Local (Python 3.11)
+
+```bash
 pip install -r requirements.txt
-```
-
-İlk çalıştırmada VGG16 ağırlıkları (~60 MB) Keras tarafından, CLIP ağırlıkları (~1,5 GB) Hugging Face'ten otomatik indirilir. TensorFlow ve PyTorch birlikte kurulduğu için ortam ~3 GB yer kaplar.
-
-Veri setlerini hazırlamak için Docker'daki gibi `python scripts/setup_data.py women | products | hm`.
-
-## Kullanım
-
-Tüm komutlar proje klasöründen çalıştırılır.
-
-### Komut satırı
-
-Özellikleri çıkarıp önbelleğe almak için (93 görsel için birkaç saniye sürer):
-
-```bash
-python -m fashion_rec index           # önbellek varsa onu kullanır
-python -m fashion_rec index --force   # önbelleği yok sayıp yeniden hesaplar
-python -m fashion_rec index --text    # metin araması (CLIP) indeksini de oluşturur
-```
-
-Bir görsele benzeyen kıyafetleri önermek için:
-
-```bash
-python -m fashion_rec recommend "data/women fashion/black floral saree.jpg" -n 5
-python -m fashion_rec recommend "data/women fashion/sparkling black dress.jpg" -n 5 -c 0.5   # renk önemi 0.5
-```
-
-```
-Girdi: black floral saree.jpg
-
- 1. 0.455  Anarkali suit with fitted bodice with a high neckline.jpg
- 2. 0.412  long, intricately designed dress with full sleeves.jpg
- 3. 0.393  anarkali suit with intricate silver embellishments on the neckline, sleeves.jpg
- 4. 0.379  anarkali suit with lavender in color with intricate white patterns throughout the fabric.jpg
- 5. 0.376  black jumpsuit with a diagonal stripe of glittering material running across the body.jpg
-```
-
-Girdi görseli veri setinde olmak zorunda değil, herhangi bir görsel yolu verilebilir. Önbellek yoksa `recommend` onu önce kendisi oluşturur.
-
-Metinle aramak için:
-
-```bash
-python -m fashion_rec search "kırmızı payetli elbise" -n 3
-```
-
-```
-Sorgu: kırmızı payetli elbise
-
- 1. 0.255  bright red, sequined dress with thin shoulder straps.jpg
- 2. 0.218  sleeveless dress adorned with pink sequins.jpg
- 3. 0.200  pink, knee-length dress that sparkles.jpg
-```
-
-CLIP skorları doğası gereği düşük ve birbirine yakındır (≈0,15–0,3); önemli olan sıralamadır. Her `search` çağrısı modeli yeniden yüklediği için ~10 sn sürer; arayüzde model bir kez yüklenir ve aramalar anında döner.
-
-Bir görsele benzeyen ama bir yönüyle farklı kıyafetler için (`-w`: metin ağırlığı, 0–1):
-
-```bash
-python -m fashion_rec combine "data/women fashion/royal blue off-shoulder dress.jpg" "yeşil" -n 3
-```
-
-```
-Girdi: royal blue off-shoulder dress.jpg + "yeşil" (metin ağırlığı 0.5)
-
- 1. +2.05  flowing green off-shoulder dress.jpg
- 2. +1.72  ark green, knee-length dress with short sleeves and a white, patterned neckline.jpg
- 3. +1.62  light green, short dress with lace detailing around the waist and the edges of the sleeves and hem.jpg
-```
-
-Buradaki skorlar z-skorlarının ağırlıklı toplamıdır; 0–1 aralığında değildir, yalnızca sıralama içindir.
-
-Otomatik etiketlerin dağılımını görmek için (`-v`: her görselin etiketleri):
-
-```bash
-python -m fashion_rec tags
-```
-
-```
-Renk: mavi 17, siyah 16, kırmızı 10, beyaz 9, bej / kahverengi 9, gri / gümüş 9, pembe 8, yeşil 7, mor 4, sarı 4
-Tür: elbise 65, etnik 16, pantolonlu 7, ceket / üst 3, etekli 2
-```
-
-### Web arayüzü
-
-```bash
+python scripts/setup_data.py hm          # or: products (44k), bq (your BigQuery table)
 streamlit run app.py
 ```
 
-Kenar çubuğundan arama şeklini (veri setinden seç / görsel yükle / metinle ara) ve öneri sayısını (1–12) seçin. Öneriler benzerlik skorlarıyla birlikte ızgara halinde gösterilir. Görsel modlarında isteğe bağlı **Değişiklik** kutusuna bir şey yazılırsa (ör. *kırmızı*, *uzun kollu*) görsel + metin birlikte aranır; yanındaki kaydırıcı metnin ağırlığını ayarlar. Değişiklik kutusu boşken **Renk önemi** kaydırıcısıyla rengi benzer kıyafetler öne çıkarılabilir. Kenar çubuğundaki **Filtreler** (renk, tür) her üç modda da sonuçları daraltır; bir grupta birden fazla etiket seçmek "veya", gruplar arası "ve" anlamına gelir. Her kartın altında o kıyafetin etiketleri görünür.
+Datasets are downloaded by each user from their original sources (see below); product images are not redistributed by the setup scripts. CLIP weights (~1.5 GB) download on first use. On Apple Silicon, embeddings are computed on the GPU (MPS).
 
-### Python'dan
-
-```python
-from fashion_rec.features import build_index
-from fashion_rec.recommend import recommend
-
-paths, features = build_index()
-for path, score in recommend("benim_elbisem.jpg", paths, features, top_n=5):
-    print(f"{score:.3f}  {path.name}")
-
-from fashion_rec.color import build_color_index
-
-_, colors = build_color_index()
-results = recommend("benim_elbisem.jpg", paths, features, color_features=colors, color_weight=0.4)
-
-from fashion_rec.text_search import build_text_index, load_clip_model, search
-
-clip = load_clip_model()
-paths, features = build_text_index(model=clip)
-results = search("black lace dress", paths, features, top_n=5, model=clip)
-
-from fashion_rec.text_search import combined_search
-
-results = combined_search("benim_elbisem.jpg", "kırmızı", paths, features, top_n=5, text_weight=0.5, model=clip)
-```
-
-## Testler
+### Your own catalogue from BigQuery
 
 ```bash
-python -m pytest
+cp config/bigquery.example.toml config/bigquery.toml     # project, table, column mapping
+python scripts/sync_bigquery.py --dry-run                 # shows queries + estimated scanned GB (free)
+python scripts/setup_data.py bq
 ```
 
-Testler sahte, hafif modeller (VGG16 ve CLIP yerine) ve düz renkli test görselleri kullanır. TensorFlow ve PyTorch yüklenmeden saniyenin altında çalışırlar.
+Read-only; table/column names are validated; a `--max-gb` guard stops expensive queries.
 
-## Proje yapısı
+## Datasets & licences
 
-```
-fashion-recommender/
-├── fashion_rec/          # Python paketi
-│   ├── __main__.py       # CLI giriş noktası
-│   ├── config.py         # yollar, görsel boyutu, batch boyutu
-│   ├── data.py           # görsel listeleme
-│   ├── features.py       # model yükleme, özellik çıkarma, önbellek
-│   ├── recommend.py      # benzerlik hesabı + öneri (isteğe bağlı renk ağırlığı)
-│   ├── color.py          # renk histogramı + önbellek
-│   ├── text_search.py    # çok dilli CLIP: metinden ve görsel + metin arama
-│   ├── tags.py           # CLIP ile otomatik renk / tür etiketleri + filtre
-│   ├── calibration.py    # ham skorları benzerlik yüzdesine çevirme
-│   ├── catalog.py        # ürün adları ve veri setinin kendi etiketleri (metadata.csv)
-│   ├── backbone.py       # görsel öneri modeli seçimi (VGG16 / CLIP)
-│   ├── adapter.py        # CLIP üzerine eğitilmiş doğrusal adaptör (isteğe bağlı)
-│   ├── glossary.py       # Türkçe moda terimleri sözlüğü (sorgu çevirisi)
-│   ├── diversity.py      # çeşitlilik (MMR yeniden sıralama)
-│   ├── outfit.py         # kombin önerisi
-│   ├── copurchase.py     # birlikte alınanlar (satın alma kayıtları)
-│   ├── segment_settings.py   # bölüm bazında ayarlar
-│   ├── segment_settings.json # scripts/tune_segments.py çıktısı
-│   ├── photo.py          # kırpık / yakın çekim fotoğraf tespiti
-│   └── bigquery_source.py    # BigQuery'den katalog / satış okuma
-├── app.py                # Streamlit arayüzü
-├── scripts/              # veri seti hazırlama (setup_data.py), içe aktarma, ayar / eğitim scriptleri
-├── config/               # bigquery.example.toml (bigquery.toml git dışında)
-├── Dockerfile, docker-compose.yml
-├── data/women fashion/   # 93 kadın kıyafeti görseli
-├── notebooks/            # model / havuzlama karşılaştırmaları
-├── docs/                 # README görselleri
-├── tests/                # pytest testleri
-├── requirements.txt
-└── PROJE.md              # yol haritası ve çalışma notları
-```
-
-Ayarlar (veri klasörü, önbellek yolları, görsel boyutu, batch boyutu, CLIP modeli) `fashion_rec/config.py` içindedir.
-
-## Veri setleri
-
-Veri seti arayüzde kenar çubuğundaki **Veri seti** seçicisinden değiştirilir (yalnız indirilmiş veri setleri listelenir); başlangıç değeri `FASHION_DATASET` ortam değişkeniyle verilebilir, belirtilmezse `products` indirilmişse o, değilse `women` açılır. Önbellekler `cache/<veri seti>/` altında ayrı tutulur.
-
-| ad | içerik | görsel öneri modeli |
+| Dataset | Source | Notes |
 |---|---|---|
-| `women` | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
-| `products` (indirilmişse varsayılan) | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
-| `bq` | `config/bigquery.toml`'da tanımlı BigQuery ürün tablosu (`scripts/sync_bigquery.py`) | CLIP |
-| `hm` | [H&M](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data) ürünlerinden ~26 bin ürünlük dengeli alt küme (1.220 cinsiyetsiz çocuk ayakkabısı dahil: "Çocuk", hem kız hem erkek çocuğa önerilir), `data/hm/`, git dışında. Temiz stüdyo çekimleri; cinsiyet, ürün grubu, ürün türü ve renk etiketli (kullanım etiketi yok: Spor dışı her şey "günlük"). | CLIP |
+| H&M (26k products + purchases) | [H&M Personalized Fashion Recommendations](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations) via Hugging Face mirrors | Competition data, non-commercial use; images © H&M |
+| Fashion Product Images (44k) | [Kaggle](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small) (MIT), 384×512 HF copy | Images originate from Myntra |
+| Women's fashion sample (93 images) | included in `data/women fashion/` | Demo fallback only; rights belong to their owners |
 
-```bash
-streamlit run app.py                                   # products indirilmişse onu açar
-FASHION_DATASET=women streamlit run app.py             # 93 görsellik kadın veri seti
-python -m fashion_rec search "kız çocuk elbisesi"
+The code is MIT-licensed ([LICENSE](LICENSE)); dataset images remain the property of their respective owners. This is a learning project, not affiliated with any brand.
+
+## Project structure
+
+```
+fashion_rec/          core package: embeddings, search, outfits, co-purchase, calibration, BigQuery …
+app.py                Streamlit UI
+scripts/              dataset setup / import, tuning, evaluation, BigQuery sync
+notebooks/            experiments and evaluations (model, pooling, colour, tags, diversity, outfits)
+tests/                157 tests (no model / network needed — fake models and clients)
+config/               bigquery.example.toml
+Dockerfile, docker-compose.yml
 ```
 
-**`hm` kurulumu** (~1 GB disk, öğrenme amaçlı; haklar H&M'e ait, Kaggle yarışma kuralları gereği ticari olmayan kullanım):
-
-```bash
-python scripts/import_hm.py --limit 25000                # etiketler + görseller (~1 saat)
-FASHION_DATASET=hm python -m fashion_rec index           # CLIP vektörleri
-FASHION_DATASET=hm python scripts/tune_segments.py       # bölüm ayarları
-FASHION_DATASET=hm streamlit run app.py
-```
-
-Etiketler Hugging Face'teki `Qdrant/hm_ecommerce_products` kopyasından (oradaki görsel bağlantıları artık çalışmıyor), görseller `microsoft/hnm-search-data` deposundan alınır; bölümlere dengeli dağıtılır, aynı ürünün en fazla 2 renk çeşidi seçilir ve görseller 512 piksel yüksekliğe küçültülür.
-
-**`bq`: BigQuery'den katalog** (`fashion_rec/bigquery_source.py`, `scripts/sync_bigquery.py`): bir BigQuery ürün tablosu (ad, kategori, cinsiyet, renk, görsel bağlantısı) `bq` veri seti olarak indirilir; isteğe bağlı satış tablosundan "birlikte alınanlar" üretilir. Yalnızca okuma yapılır.
-
-```bash
-cp config/bigquery.example.toml config/bigquery.toml     # proje, tablo ve sütun eşlemesini doldurun
-gcloud auth application-default login                    # kimlik
-python scripts/sync_bigquery.py --dry-run                 # sorgular + tahmini taranacak veri (ücretsiz)
-python scripts/setup_data.py bq                           # eşitle + vektörler + bölüm ayarları
-```
-
-- Tablo ve sütun adları şirketten şirkete değiştiği için hepsi `config/bigquery.toml`'da eşlenir; değerler de eşlenebilir (ör. cinsiyet sütunundaki "Kadın" → "Women"). Görsel sütunu `https://` veya `gs://` adresi olabilir.
-- BigQuery taranan veri miktarına göre ücretlendirir: her sorgudan önce tahmini taranacak veri hesaplanır, `--max-gb` (varsayılan 20 GB) aşılırsa iptal edilir. `limit`, `where`, `transactions_since` ile daraltılabilir.
-- Tablo / sütun adları sorguya eklenmeden önce doğrulanır; `config/bigquery.toml` git dışındadır (proje ve tablo adları içerir). Docker'da `config/` ve gcloud kimliği (salt okunur) konteynere bağlanır.
-
-**`products` kurulumu** (~4 GB disk): `scripts/import_products.py` dosyasının başındaki komutla Hugging Face'teki 384×512 kopyayı (`benitomartin/fashion-product-images-small-384x512`, 5 parquet dosyası, 2 GB) `data/products/raw/` altına indirin, sonra:
-
-```bash
-python scripts/import_products.py                       # görseller + metadata.csv
-FASHION_DATASET=products python -m fashion_rec index    # CLIP vektörleri (Apple GPU ile ~4 dk)
-```
-
-Bu veri setinde arayüzdeki filtreler CLIP tahminleri yerine ürünlerin kendi etiketlerinden gelir: **Cinsiyet** (Erkek / Kadın / Erkek Çocuk / Kız Çocuk / Unisex), **Kategori** (Giyim / Aksesuar / Ayakkabı / Kişisel Bakım…), **Ürün türü** ve **Renk**. Ürün seçici, açılır liste yerine ad aramasıyla çalışır.
-
-**Bölümler**: ürünler Kadın / Erkek / Kız Çocuk / Erkek Çocuk / Aksesuar bölümlerine ayrılır (aksesuarlar cinsiyetten bağımsız; birkaç yüz unisex ürün ayrı). Arayüzde **Aynı bölümden öner** (varsayılan açık) önerileri seçilen ürünün bölümüyle sınırlar; yüklenen görselin bölümü en yakın 20 komşunun çoğunluğundan tahmin edilir. **Renk önemi** her bölüm için ölçülmüş değerle açılır (`scripts/tune_segments.py` → `fashion_rec/segment_settings.json`; hedef: ürün türü ve renk isabetinin ortalaması, sorguların yarısında seçilip diğer yarısında ölçülür):
-
-| bölüm | ürün | cinsiyet isabeti: tüm katalog → aynı bölüm | seçilen renk önemi | renk isabeti (0 → seçilen) | tür isabeti (0 → seçilen) |
-|---|---|---|---|---|---|
-| Kadın | 12.852 | 0,944 → 1,000 | 0,2 | 0,360 → 0,446 | 0,764 → 0,706 |
-| Erkek | 17.492 | 0,964 → 1,000 | 0,3 | 0,461 → 0,597 | 0,922 → 0,892 |
-| Kız Çocuk | 807 | 0,855 → 1,000 | 0,2 | 0,460 → 0,565 | 0,764 → 0,733 |
-| Erkek Çocuk | 1.030 | 0,845 → 1,000 | 0,4 | 0,450 → 0,632 | 0,921 → 0,864 |
-| Aksesuar | 11.244 | 0,878 → 0,876 | 0,5 | 0,463 → 0,562 | 0,940 → 0,913 |
-
-Veri setinde adında "girl" geçen 185, "boy" geçen 210 ürün yetişkin olarak etiketlidir (ör. "Doodle Girl Little Princess Pink Tops" → Women); bunlar adlarına göre çocuk bölümüne alınır (`catalog.corrected_gender`). Benzerlik yüzdesi de bölüm içindeki tipik eşleşmelerle hesaplanır.
-
-**Çeşitlilik** (kenar çubuğu, varsayılan 0,2): neredeyse aynı ürünlerin (aynı ürünün başka ilanı, aynı modelin renkleri) önerileri doldurmasını önler. Bölüm içi ilk 5 öneride sorguların %28'inde aynı adlı ürün tekrarı vardı; ama aynı adlı ürünlerin çoğu farklıdır (görsel benzerlik medyanı 0,85, yalnız %6'sı neredeyse aynı fotoğraf), bu yüzden ada göre eleme yerine görsel MMR yeniden sıralaması kullanılır (`fashion_rec/diversity.py`): aday, sorguya benzerliğiyle puan kazanır, seçilmiş önerilere benzerliğiyle (ve sorgunun neredeyse kopyasıysa) puan kaybeder. `notebooks/compare_diversity.py` (1.000 sorgu):
-
-| çeşitlilik | tür isabeti | öneriler arası benzerlik | neredeyse kopya içeren sorgu |
-|---|---|---|---|
-| 0 | 0,876 | 0,844 | %14 |
-| **0,2** | 0,866 | 0,826 | %9 |
-| 0,4 | 0,838 | 0,788 | %8 |
-| 0,6 | 0,772 | 0,728 | %0 |
-
-**Kombin önerisi** (görsel modlarında "Kombin önerisi" sekmesi, `fashion_rec/outfit.py`): seçilen ürünü tamamlayan parçalar (gömleğe alt + ayakkabı + aksesuar, elbiseye ayakkabı + aksesuar…). Veri setinde "birlikte giyilir" bilgisi olmadığından kurallara dayalıdır:
-- rol alt kategoriden çıkar (üst / alt / tek parça / ayakkabı / aksesuar), yuvalar role göre seçilir,
-- adaylar aynı cinsiyetten (veya unisex) ve uyumlu kullanımdandır (resmi ↔ resmi / yarı resmi, spor ↔ spor / günlük, etnik ↔ etnik / günlük),
-- sıralama: CLIP stil benzerliği + kullanım birebir eşleşmesi + renk uyumu (nötr renkler ve kot her şeyle uyar, iki farklı canlı renk cezalı) + mevsim,
-- etiket hatalarına karşı iki kontrol: adı başka rolü söyleyen ürünler ("… White Shirts" adlı terlik) ve görseli yuvanın rolüne benzemeyen ürünler (CLIP; "… Wallet" görselinde gömlek) aday olmaz; neredeyse aynı görseller bir yuvada tekrarlanmaz,
-- yüklenen görselde ürün türü, cinsiyet ve kullanım en yakın 20 komşudan tahmin edilir.
-
-Vekil ölçütler (`notebooks/outfit_examples.py`, 500 sorgu; sezgisel bu kuralları kullandığı için yalnızca kuralların işlediğini gösterir): kullanım birebir 0,84 (rastgele) / 0,89 (yalnız CLIP) / **0,97**; renk uyumu 0,88 / 0,81 / **0,98**. Asıl değerlendirme gözle: `notebooks/outfit_examples/examples.png`. Sınırlama: desen uyumuna bakmaz (ekose gömleğe ekose şort önerebilir).
-
-**Metin aramasında cinsiyet**: sorgudaki cinsiyet / yaş ifadesi ("kız çocuk elbisesi", "erkek gömleği", "women") sonuçları süzer (`glossary.gender_in_query`); aksesuarlar kaybolmasın diye bölüme değil ürünün cinsiyetine göre süzülür, "Aynı bölümden öner" kapatılınca devre dışı kalır.
-
-**Birlikte alınanlar ve satın alma verisiyle kombin (H&M)**: H&M'in 31,8 milyon satın alma kaydından (2018–2020) katalogdaki ürünleri içeren 5,6 milyon satır kullanılır (`scripts/build_copurchase.py`). Sepet = aynı müşterinin aynı gün aldıkları; ~1 milyon sepetten 1,6 milyon ürün çifti çıkar. Arayüzde H&M veri setinde üçüncü sekme **Birlikte alınanlar** (aynı ürünün başka renkleri hariç) ve kombin önerisinde birlikte alınma sinyali (`fashion_rec/copurchase.py`).
-
-Kombin önerisinin ilk gerçek ölçümü (`notebooks/evaluate_copurchase.py`): 2020-06-22 öncesiyle öğrenilip sonraki 3 ayın sepetlerinde test edildi; ölçüt, müşterinin sorgu ürünüyle aynı gün aldığı tamamlayıcı parçanın (ör. üstle alınan pantolon) yuvadaki ~2.200 aday arasında ilk 10'a girme oranı:
-
-| yöntem | ilk 10 (tümü) | geçmişi olan ürünler | yeni ürünler |
-|---|---|---|---|
-| rastgele | 0,004 | 0,004 | 0,012 |
-| kurallar (önceki kombin) | 0,026 | 0,022 | 0,035 |
-| çok satanlar | 0,043 | 0,046 | 0,035 |
-| birlikte alınma | 0,087 | 0,109 | — |
-| **kurallar + birlikte alınma + çok satanlar** | **0,088** | **0,110** | 0,035 |
-
-Kurallar tek başına çok satanlardan bile zayıf çıktı; birlikte alınma, geçmişi olan ürünlerde kurallardan ~5 kat iyi. Yeni ürünlerde (satış geçmişi yok) birlikte alınma bilgisi olmadığından kurallar devreye girer (hedefin medyan sırası kurallarda 444, çok satanlarda 1.135). Sınırlama: az satan ürünlerde birlikte alınma sayıları küçük (1–2 sepet) ve gürültülü olabilir.
-
-Lisans: Kaggle'da MIT olarak yayınlanmıştır, ancak görseller Myntra'dan alınmıştır; ticari kullanımdan önce hak durumunu kontrol edin.
-
-**Gerçek etiketlerle değerlendirme** (`notebooks/evaluate_products.py`): 5.000 ürünlük alt katalogda 1.000 sorgu, ilk 5 önerinin aynı etiketi taşıma oranı:
-
-| yöntem | ürün türü | renk | cinsiyet | ana kategori |
-|---|---|---|---|---|
-| VGG16 flatten | 0,755 | 0,266 | 0,837 | 0,987 |
-| VGG16 avg | 0,716 | 0,299 | 0,810 | 0,983 |
-| **CLIP görsel** | **0,810** | **0,334** | **0,874** | **0,992** |
-| CLIP + renk 0,3 | 0,762 | 0,440 | 0,858 | 0,988 |
-
-Metinden aramada 20 Türkçe/İngilizce sorgunun ilk 10 sonucunda ortalama isabet 0,79; zayıf olanlar "kemer" (0), "yeşil kurta" (0,2), "kırmızı elbise" (0,3). Zayıflığın kaynağı çoğunlukla Türkçe kelime dağarcığıdır: "kemer" 0 iken "belt" 1,0; "terlik" 0,3 iken "flip flops" 1,0.
-
-**Türkçe moda sözlüğü** (`fashion_rec/glossary.py`): ~200 terim (giyim, ayakkabı, aksesuar, kozmetik, renk, desen, cinsiyet). Sorgudaki bilinen terimler İngilizceye çevrilir ve arama bu çeviriyle yapılır; ekli haller kökten tanınır ("gömleği", "çantası"), çok kelimeli ifadeler önce denenir ("kol saati", "kız çocuk"), sözlükte olmayan kelimeler (marka adları) olduğu gibi kalır. Arayüz çeviriyi "Sözlükle aranan: belt" diye gösterir. Etki (`notebooks/compare_glossary.py`, tüm katalogda ilk 10 isabet):
-
-| sorgu seti | sözlüksüz | sözlükle |
-|---|---|---|
-| geliştirme (19 Türkçe sorgu; sözlük yazılırken görüldü) | 0,805 | 0,884 |
-| **ayrık** (30 Türkçe sorgu; sözlükten önce hazırlandı, ayarlamada kullanılmadı) | 0,680 | **0,830** |
-
-En büyük kazançlar: "erkek kemer" 0 → 1,0, "sütyen" 0,1 → 0,9, "kazak" 0 → 0,9, "terlik" 0,3 → 1,0. Gerileyenler de var: "topuklu ayakkabı" 1,0 → 0,7, "erkek şort" 1,0 → 0,7, "mor elbise" 0,5 → 0,3.
-
-**Model eğitimi denemesi** (`scripts/train_adapter.py`): CLIP dondurulup üzerine doğrusal bir adaptör, görselleri ürün adlarıyla / etiket şablonlarıyla ("Women Silver Watches") eşleştirecek şekilde eğitildi; ürünlerin %20'si testte hiç görülmedi. En iyi ayar (şablon, λ=0,1) testte etiket sorgularını 0,754 → 0,768, Türkçe sorguları 0,742 → 0,753, görsel renk eşleşmesini 0,355 → 0,379 iyileştirdi; ama doğrulamada Türkçe sorgular 0,774 → 0,753 geriledi. Kazanç küçük ve gürültü payı içinde olduğu için adaptör **kullanılmıyor**; altyapı (`fashion_rec/adapter.py`) yerinde, `cache/<veri seti>/clip_adapter.npz` varsa otomatik devreye girer.
+**Tech:** Python · PyTorch · open_clip · TensorFlow (VGG16) · NumPy / SciPy · Streamlit · Google BigQuery · Docker · pytest
