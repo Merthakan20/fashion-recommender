@@ -1,0 +1,46 @@
+# BigQuery veri kaynağı ayarları — bu dosyayı config/bigquery.toml olarak kopyalayıp doldurun
+# (config/bigquery.toml git dışındadır). Yalnızca okuma yapılır; tablolara yazılmaz.
+#
+#   python scripts/sync_bigquery.py --dry-run   # sorguyu ve tarayacağı veri miktarını göster (ücretsiz)
+#   python scripts/sync_bigquery.py             # ürünleri + görselleri indir, "bq" veri setini hazırla
+#
+# Kimlik doğrulama: `gcloud auth application-default login` (veya GOOGLE_APPLICATION_CREDENTIALS).
+
+[bigquery]
+project = "proje-adi"                                  # sorguların çalışacağı (faturalanacağı) proje
+products_table = "proje-adi.veri_seti.urunler"         # proje.veri_seti.tablo
+where = ""                                             # isteğe bağlı tek koşul, ör. "aktif = TRUE"
+limit = 0                                              # 0 = tümü; deneme için ör. 2000
+transactions_table = ""                                # isteğe bağlı: "birlikte alınanlar" için satış tablosu
+transactions_since = ""                                # ör. "2025-01-01" (satış tabloları büyük olabilir)
+
+# Uygulama alanı = ürün tablosundaki sütun adı. id ve image zorunlu; boş bırakılan alanlar atlanır.
+[columns]
+id = "urun_id"
+image = "gorsel_url"            # https://… veya gs://… adresi
+name = "urun_adi"
+gender = "cinsiyet"             # uygulama Women / Men / Girls / Boys / Unisex bekler (aşağıda eşlenebilir)
+masterCategory = "ana_kategori" # Apparel / Accessories / Footwear / Personal Care
+subCategory = "alt_kategori"    # kombin rolleri için: Topwear / Bottomwear / Dress / Shoes / Bags / Watches …
+articleType = "urun_tipi"
+baseColour = "renk"
+season = ""
+usage = ""                      # Casual / Formal / Sports / Ethnic
+
+# İsteğe bağlı değer eşlemeleri: tablodaki değer = uygulamanın beklediği değer
+[values.gender]
+"Kadın" = "Women"
+"Erkek" = "Men"
+"Kız Çocuk" = "Girls"
+"Erkek Çocuk" = "Boys"
+
+[values.masterCategory]
+"Giyim" = "Apparel"
+"Aksesuar" = "Accessories"
+"Ayakkabı" = "Footwear"
+
+# transactions_table doluysa zorunlu
+[transaction_columns]
+customer = "musteri_id"
+day = "satis_tarihi"
+product = "urun_id"

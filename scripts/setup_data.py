@@ -1,6 +1,6 @@
 """Bir veri setini tek komutla kullanıma hazırlar: indirme + vektörler + ayarlar.
 
-    python scripts/setup_data.py women | products | hm
+    python scripts/setup_data.py women | products | hm | bq
 
 Görseller imaja / depoya konmaz; her kullanıcı kaynağından indirir (H&M ve
 Myntra görsellerinin hakları markalara aittir, yeniden dağıtılmaz).
@@ -8,6 +8,7 @@ Myntra görsellerinin hakları markalara aittir, yeniden dağıtılmaz).
 - women:    git'teki 93 görsel; VGG16 + CLIP vektörleri (~1 dk)
 - products: Fashion Product Images 44 bin ürün (~2 GB indirme, ~4 GB disk);
             CLIP vektörleri + bölüm ayarları
+- bq:       config/bigquery.toml'daki BigQuery ürün tablosu (scripts/sync_bigquery.py)
 - hm:       H&M ~26 bin ürün (~1 saat indirme, ~650 MB disk); CLIP vektörleri,
             bölüm ayarları, satın alma kayıtlarından birlikte alınma matrisi
             (774 MB indirilir, işlenince silinir)
@@ -29,6 +30,7 @@ STEPS = {
     "products": [["scripts/import_products.py"], ["-m", "fashion_rec", "index"], ["scripts/tune_segments.py"]],
     "hm": [["scripts/import_hm.py", "--limit", "25000"], ["-m", "fashion_rec", "index"],
            ["scripts/tune_segments.py"], ["scripts/build_copurchase.py"]],
+    "bq": [["scripts/sync_bigquery.py"], ["-m", "fashion_rec", "index"], ["scripts/tune_segments.py"]],
 }
 
 

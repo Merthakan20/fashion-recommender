@@ -10,3 +10,6 @@ data/products/
 cache/
 notebooks/products_eval_cache.npz
 data/hm/
+data/bq/
+# BigQuery ayarları proje / tablo adı içerir; örneği git'te: config/bigquery.example.toml
+config/bigquery.toml

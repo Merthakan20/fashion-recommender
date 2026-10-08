@@ -55,3 +55,24 @@ def bought_together(path: Path, paths: list[Path], matrix, metadata: Metadata,
         if len(out) == k:
             break
     return out
+
+
+MAX_BASKET = 30  # toptan alımlar gibi çok büyük sepetler çiftleri şişirmesin
+
+
+def baskets_matrix(customer: np.ndarray, day: np.ndarray, item: np.ndarray, n_items: int):
+    """(sepet × ürün) ikili seyrek matris; sepet = (müşteri, gün), 2–30 farklı ürünlü sepetler."""
+    keys = np.unique(np.stack([customer, day], axis=1), axis=0, return_inverse=True)[1].ravel()
+    m = sparse.csr_matrix((np.ones(len(item), dtype=np.float32), (keys, item)), shape=(keys.max() + 1, n_items))
+    m.data[:] = 1  # aynı sepette aynı ürün birden çok kez alınmış olabilir
+    sizes = np.asarray(m.sum(axis=1)).ravel()
+    return m[(sizes >= 2) & (sizes <= MAX_BASKET)]
+
+
+def copurchase_matrix(baskets) -> sparse.csr_matrix:
+    """(ürün × ürün) birlikte alınma sayıları: aynı sepette kaç kez birlikte geçtikleri."""
+    cooc = (baskets.T @ baskets).tocsr()
+    cooc.setdiag(0)
+    cooc.eliminate_zeros()
+    return cooc
+

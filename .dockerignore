@@ -1,6 +1,8 @@
 # veri setleri ve önbellekler imaja girmez (docker-compose.yml'de birim olarak bağlanır)
 data/products/
 data/hm/
+data/bq/
+config/bigquery.toml
 cache/
 notebooks/products_eval_cache.npz
 .git/

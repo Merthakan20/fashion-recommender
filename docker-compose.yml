@@ -5,12 +5,16 @@ services:
     ports:
       - "8501:8501"
     environment:
-      # açılışta gösterilecek veri seti (women | products | hm); boşsa indirilmiş olana göre seçilir
+      # açılışta gösterilecek veri seti (products | hm | bq); boşsa indirilmiş olana göre seçilir
       - FASHION_DATASET=${FASHION_DATASET:-}
     volumes:
       # veri setleri ve önbellekler konteyner silinse de kalır; yerel kurulumla aynı klasörler
       - ./data/products:/app/data/products
       - ./data/hm:/app/data/hm
+      - ./data/bq:/app/data/bq
+      - ./config:/app/config
+      # BigQuery kimliği (gcloud auth application-default login) salt okunur
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
       - ./cache:/app/cache
       - models:/models
 

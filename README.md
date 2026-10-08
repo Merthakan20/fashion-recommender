@@ -212,9 +212,12 @@ fashion-recommender/
 │   ├── outfit.py         # kombin önerisi
 │   ├── copurchase.py     # birlikte alınanlar (satın alma kayıtları)
 │   ├── segment_settings.py   # bölüm bazında ayarlar
-│   └── segment_settings.json # scripts/tune_segments.py çıktısı
+│   ├── segment_settings.json # scripts/tune_segments.py çıktısı
+│   ├── photo.py          # kırpık / yakın çekim fotoğraf tespiti
+│   └── bigquery_source.py    # BigQuery'den katalog / satış okuma
 ├── app.py                # Streamlit arayüzü
 ├── scripts/              # veri seti hazırlama (setup_data.py), içe aktarma, ayar / eğitim scriptleri
+├── config/               # bigquery.example.toml (bigquery.toml git dışında)
 ├── Dockerfile, docker-compose.yml
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları
@@ -234,6 +237,7 @@ Veri seti arayüzde kenar çubuğundaki **Veri seti** seçicisinden değiştiril
 |---|---|---|
 | `women` | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
 | `products` (indirilmişse varsayılan) | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
+| `bq` | `config/bigquery.toml`'da tanımlı BigQuery ürün tablosu (`scripts/sync_bigquery.py`) | CLIP |
 | `hm` | [H&M](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data) ürünlerinden ~26 bin ürünlük dengeli alt küme (1.220 cinsiyetsiz çocuk ayakkabısı dahil: "Çocuk", hem kız hem erkek çocuğa önerilir), `data/hm/`, git dışında. Temiz stüdyo çekimleri; cinsiyet, ürün grubu, ürün türü ve renk etiketli (kullanım etiketi yok: Spor dışı her şey "günlük"). | CLIP |
 
 ```bash
@@ -252,6 +256,19 @@ FASHION_DATASET=hm streamlit run app.py
 ```
 
 Etiketler Hugging Face'teki `Qdrant/hm_ecommerce_products` kopyasından (oradaki görsel bağlantıları artık çalışmıyor), görseller `microsoft/hnm-search-data` deposundan alınır; bölümlere dengeli dağıtılır, aynı ürünün en fazla 2 renk çeşidi seçilir ve görseller 512 piksel yüksekliğe küçültülür.
+
+**`bq`: BigQuery'den katalog** (`fashion_rec/bigquery_source.py`, `scripts/sync_bigquery.py`): bir BigQuery ürün tablosu (ad, kategori, cinsiyet, renk, görsel bağlantısı) `bq` veri seti olarak indirilir; isteğe bağlı satış tablosundan "birlikte alınanlar" üretilir. Yalnızca okuma yapılır.
+
+```bash
+cp config/bigquery.example.toml config/bigquery.toml     # proje, tablo ve sütun eşlemesini doldurun
+gcloud auth application-default login                    # kimlik
+python scripts/sync_bigquery.py --dry-run                 # sorgular + tahmini taranacak veri (ücretsiz)
+python scripts/setup_data.py bq                           # eşitle + vektörler + bölüm ayarları
+```
+
+- Tablo ve sütun adları şirketten şirkete değiştiği için hepsi `config/bigquery.toml`'da eşlenir; değerler de eşlenebilir (ör. cinsiyet sütunundaki "Kadın" → "Women"). Görsel sütunu `https://` veya `gs://` adresi olabilir.
+- BigQuery taranan veri miktarına göre ücretlendirir: her sorgudan önce tahmini taranacak veri hesaplanır, `--max-gb` (varsayılan 20 GB) aşılırsa iptal edilir. `limit`, `where`, `transactions_since` ile daraltılabilir.
+- Tablo / sütun adları sorguya eklenmeden önce doğrulanır; `config/bigquery.toml` git dışındadır (proje ve tablo adları içerir). Docker'da `config/` ve gcloud kimliği (salt okunur) konteynere bağlanır.
 
 **`products` kurulumu** (~4 GB disk): `scripts/import_products.py` dosyasının başındaki komutla Hugging Face'teki 384×512 kopyayı (`benitomartin/fashion-product-images-small-384x512`, 5 parquet dosyası, 2 GB) `data/products/raw/` altına indirin, sonra:
 

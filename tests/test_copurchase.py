@@ -48,3 +48,15 @@ def test_copurchase_weight_changes_outfit_order():
     assert plain["alt"][0][0].name == "jeans_a.jpg"  # stil benzerliği
     bought = catalog.suggest(META["shirt.jpg"], feats[0], per_slot=2, weights=Weights(copurchase=8), exclude=paths[0])
     assert bought["alt"][0][0].name == "jeans_b.jpg"  # birlikte daha çok alınan
+
+
+def test_baskets_and_copurchase_matrix():
+    from fashion_rec.copurchase import baskets_matrix, copurchase_matrix
+
+    customer = np.array([1, 1, 1, 2, 2, 3])
+    day = np.array([10, 10, 10, 10, 10, 11])
+    item = np.array([0, 1, 1, 0, 2, 3])   # müşteri 1: {0, 1} (1 iki kez), müşteri 2: {0, 2}, müşteri 3: {3} (tek ürün)
+    baskets = baskets_matrix(customer, day, item, 4)
+    assert baskets.shape == (2, 4)        # tek ürünlü sepet atlanır
+    cooc = copurchase_matrix(baskets).toarray()
+    assert cooc[0, 1] == cooc[0, 2] == 1 and cooc[1, 2] == 0 and cooc.diagonal().sum() == 0

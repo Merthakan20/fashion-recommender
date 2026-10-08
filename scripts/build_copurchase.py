@@ -30,22 +30,11 @@ import pyarrow.parquet as pq  # noqa: E402
 from scipy import sparse  # noqa: E402
 
 from fashion_rec.config import CACHE_DIR, DATASET  # noqa: E402
+from fashion_rec.copurchase import baskets_matrix, copurchase_matrix  # noqa: E402
 from fashion_rec.data import list_images  # noqa: E402
 
 URL = "https://huggingface.co/datasets/microsoft/hnm-search-data/resolve/main/data/processed/transactions_train.parquet"
 RAW = PROJECT_ROOT / "data" / "hm" / "raw" / "transactions_train.parquet"
-MAX_BASKET = 30  # toptan alımlar gibi çok büyük sepetler çiftleri şişirmesin
-
-
-def baskets_matrix(customer, day, item, n_items):
-    """(sepet × ürün) ikili seyrek matris; sepet = (müşteri, gün)."""
-    keys = np.unique(np.stack([customer, day], axis=1), axis=0, return_inverse=True)[1].ravel()
-    m = sparse.csr_matrix((np.ones(len(item), dtype=np.float32), (keys, item)), shape=(keys.max() + 1, n_items))
-    m.data[:] = 1  # aynı sepette aynı ürün birden çok kez alınmış olabilir
-    sizes = np.asarray(m.sum(axis=1)).ravel()
-    return m[(sizes >= 2) & (sizes <= MAX_BASKET)]
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cutoff", help="bu tarihten (YYYY-AA-GG) önceki sepetlerle öğren, sonrasını test için ayır")
@@ -73,9 +62,7 @@ def main():
 
     def build(mask, name):
         b = baskets_matrix(customer[mask], day[mask], item[mask], len(paths))
-        cooc = (b.T @ b).tocsr()
-        cooc.setdiag(0)
-        cooc.eliminate_zeros()
+        cooc = copurchase_matrix(b)
         sparse.save_npz(CACHE_DIR / name, cooc)
         print(f"{name}: {b.shape[0]:,} sepet, {cooc.nnz // 2:,} ürün çifti", flush=True)
         return b

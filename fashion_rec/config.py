@@ -15,12 +15,13 @@ DATASETS = {
     "women": PROJECT_ROOT / "data" / "women fashion",       # 93 kadın kıyafeti (git'te)
     "products": PROJECT_ROOT / "data" / "products" / "images",  # Fashion Product Images, 44 bin ürün (git dışında)
     "hm": PROJECT_ROOT / "data" / "hm" / "images",              # H&M, ~25 bin ürünlük alt küme (git dışında)
+    "bq": PROJECT_ROOT / "data" / "bq" / "images",              # BigQuery'den eşitlenen katalog (scripts/sync_bigquery.py)
 }
 DATASET_LABELS = {"women": "Kadın kıyafetleri (93)", "products": "Fashion Product Images (44 bin)",
-                  "hm": "H&M (25 bin, satın alma verili)"}
+                  "hm": "H&M (25 bin, satın alma verili)", "bq": "BigQuery kataloğu"}
 # Görselden öneride kullanılan model: "vgg16" (25.088 boyut, küçük kataloglar) veya "clip" (512 boyut).
 # VGG16 vektörleri 44 bin üründe ~4,4 GB tutar; karşılaştırma: notebooks/evaluate_products.py
-IMAGE_BACKBONES = {"women": "vgg16", "products": "clip", "hm": "clip"}
+IMAGE_BACKBONES = {"women": "vgg16", "products": "clip", "hm": "clip", "bq": "clip"}
 METADATA_FILE = "metadata.csv"  # varsa görsellerle aynı klasörde: dosya adı -> ürün adı ve etiketler
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
