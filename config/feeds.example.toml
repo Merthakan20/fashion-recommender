@@ -1,0 +1,38 @@
+# Marka ürün feed'leri — bu dosyayı config/feeds.toml olarak kopyalayıp doldurun (config/feeds.toml git dışındadır).
+#
+#   python scripts/sync_feeds.py --dry-run   # feed'leri okur, kaç ürünün alınacağını gösterir (görsel indirmez)
+#   python scripts/setup_data.py feed        # ürünler + görseller + CLIP vektörleri → "feed" veri seti
+#
+# Feed nereden alınır? Markaların ürün listeleri affiliate ağlarında (Admitad, Awin, Trendyol / Hepsiburada
+# affiliate programları…) veya markanın Google Merchant Center feed'i olarak yayınlanır; programa katılınca
+# feed adresi verilir (çoğu zaman adreste kişisel bir anahtar bulunur, bu yüzden bu dosya git dışında).
+# Yalnızca kullanım hakkınız olan feed'leri kullanın; mağaza sitelerini kazımayın (scraping).
+#
+# format = "google": Google Shopping XML (g:id, g:image_link, g:product_type, g:gender, g:color …); eşleme gerekmez.
+# format = "csv":    [feeds.columns] ile alan = CSV sütunu eşlemesi; id, title ve image_link zorunlu.
+# source: https://… adresi veya yerel dosya yolu. limit: marka başına en fazla ürün (0 = tümü).
+
+[[feeds]]
+brand = "Marka A"
+source = "https://ornek-affiliate-agi.com/feeds/marka-a.xml?token=ANAHTARINIZ"
+format = "google"
+limit = 5000
+
+[[feeds]]
+brand = "Marka B"
+source = "~/Downloads/marka-b-urunler.csv"
+format = "csv"
+delimiter = ";"
+limit = 5000
+
+[feeds.columns]
+id = "urun_kodu"
+title = "urun_adi"
+link = "urun_linki"
+image_link = "gorsel_url"
+price = "fiyat"
+sale_price = "indirimli_fiyat"
+product_type = "kategori"     # ör. "Kadın > Giyim > Elbise": bölüm ve ürün türü buradan çıkarılır
+gender = ""                   # male / female / unisex (boşsa kategori yolu ve ürün adından)
+age_group = ""                # adult / kids
+color = "renk"                # Türkçe veya İngilizce ("Lacivert" → Navy Blue)

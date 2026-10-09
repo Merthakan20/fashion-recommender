@@ -33,8 +33,9 @@ def test_unknown_dataset_is_rejected():
 
 def test_women_dataset_only_listed_when_nothing_else_is_downloaded(tmp_path, monkeypatch):
     empty = tmp_path / "yok"
-    monkeypatch.setitem(config.DATASETS, "hm", empty)
-    monkeypatch.setitem(config.DATASETS, "products", empty)
+    for name in config.DATASETS:  # yerelde indirilmiş veri setlerinden bağımsız
+        if name != "women":
+            monkeypatch.setitem(config.DATASETS, name, empty)
     assert config.available_datasets() == ["women"]
     hm = tmp_path / "hm"
     hm.mkdir()

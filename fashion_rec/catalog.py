@@ -40,6 +40,7 @@ LABEL_GROUPS = {
                                     "Sporting Goods": "Spor Malzemesi", "Home": "Ev"}),
     "Ürün türü": ("articleType", {}),
     "Renk": ("baseColour", {}),
+    "Marka": ("brand", {}),   # yalnız marka sütunu olan veri setlerinde (ürün feed'leri)
 }
 
 
@@ -72,13 +73,15 @@ def metadata_tags(paths: list[Path], metadata: Metadata) -> dict[str, dict[str, 
     """
     if not metadata:
         return {}
+    columns = next(iter(metadata.values())).keys()  # metadata.csv'nin her satırı aynı sütunlara sahip
+    groups = {g: spec for g, spec in LABEL_GROUPS.items() if g != "Marka" or spec[0] in columns}
     lookup = {}
     for p in paths:
         row = dict(metadata.get(p.name, {}))
         if row:
             row["gender"] = corrected_gender(row)
         lookup[p.name] = {group: translations.get(row.get(column, ""), row.get(column, "")) or "—"
-                          for group, (column, translations) in LABEL_GROUPS.items()}
+                          for group, (column, translations) in groups.items()}
     return lookup
 
 

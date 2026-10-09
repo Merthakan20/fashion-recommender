@@ -218,10 +218,11 @@ fashion-recommender/
 │   ├── segment_settings.py   # bölüm bazında ayarlar
 │   ├── segment_settings.json # scripts/tune_segments.py çıktısı
 │   ├── photo.py          # kırpık / yakın çekim fotoğraf tespiti
-│   └── bigquery_source.py    # BigQuery'den katalog / satış okuma
+│   ├── bigquery_source.py    # BigQuery'den katalog / satış okuma
+│   └── feed_source.py        # markaların ürün feed'leri (Google Shopping XML / CSV)
 ├── app.py                # Streamlit arayüzü
 ├── scripts/              # veri seti hazırlama (setup_data.py), içe aktarma, ayar / eğitim scriptleri
-├── config/               # bigquery.example.toml (bigquery.toml git dışında)
+├── config/               # bigquery.example.toml, feeds.example.toml (doldurulmuş halleri git dışında)
 ├── Dockerfile, docker-compose.yml
 ├── data/women fashion/   # 93 kadın kıyafeti görseli
 ├── notebooks/            # model / havuzlama karşılaştırmaları
@@ -242,6 +243,7 @@ Veri seti arayüzde kenar çubuğundaki **Veri seti** seçicisinden değiştiril
 | `women` | 93 kadın kıyafeti, `data/women fashion/`, git'te. Dosya adları kıyafetin açıklamasıdır (ör. `black floral saree.jpg`). | VGG16 |
 | `products` (indirilmişse varsayılan) | [Fashion Product Images](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small): 44.072 ürün, 384×512 görseller, `data/products/`, git dışında. Cinsiyet, ana kategori, ürün türü ve renk etiketli. | CLIP |
 | `bq` | `config/bigquery.toml`'da tanımlı BigQuery ürün tablosu (`scripts/sync_bigquery.py`) | CLIP |
+| `feed` | `config/feeds.toml`'da tanımlı marka ürün feed'leri (`scripts/sync_feeds.py`); marka, fiyat ve mağaza bağlantılı | CLIP |
 | `hm` | [H&M](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data) ürünlerinden ~26 bin ürünlük dengeli alt küme (1.220 cinsiyetsiz çocuk ayakkabısı dahil: "Çocuk", hem kız hem erkek çocuğa önerilir), `data/hm/`, git dışında. Temiz stüdyo çekimleri; cinsiyet, ürün grubu, ürün türü ve renk etiketli (kullanım etiketi yok: Spor dışı her şey "günlük"). | CLIP |
 
 ```bash
@@ -273,6 +275,18 @@ python scripts/setup_data.py bq                           # eşitle + vektörler
 - Tablo ve sütun adları şirketten şirkete değiştiği için hepsi `config/bigquery.toml`'da eşlenir; değerler de eşlenebilir (ör. cinsiyet sütunundaki "Kadın" → "Women"). Görsel sütunu `https://` veya `gs://` adresi olabilir.
 - BigQuery taranan veri miktarına göre ücretlendirir: her sorgudan önce tahmini taranacak veri hesaplanır, `--max-gb` (varsayılan 20 GB) aşılırsa iptal edilir. `limit`, `where`, `transactions_since` ile daraltılabilir.
 - Tablo / sütun adları sorguya eklenmeden önce doğrulanır; `config/bigquery.toml` git dışındadır (proje ve tablo adları içerir). Docker'da `config/` ve gcloud kimliği (salt okunur) konteynere bağlanır.
+
+**`feed`: diğer markaların ürünleri** (`fashion_rec/feed_source.py`, `scripts/sync_feeds.py`): markalar ürün listelerini affiliate ağlarında (Admitad, Awin, Trendyol / Hepsiburada affiliate programları…) ya da Google Merchant Center'da ürün feed'i olarak yayınlar. Bu feed'ler `feed` veri seti olarak indirilir. Veri seti hazır olunca diğer veri setlerinde, hem katalogdan seçilen hem yüklenen görsel için **"Diğer markalardan"** sekmesi açılır. Bu sekmede her markanın en benzer ürünleri fiyat ve "Mağazada gör" bağlantısıyla gösterilir. `feed` veri seti tek başına da açılabilir; o zaman bir marka filtresi gelir.
+
+```bash
+cp config/feeds.example.toml config/feeds.toml   # marka başına bir [[feeds]] bloğu: feed adresi / dosyası, biçim
+python scripts/sync_feeds.py --dry-run            # marka başına alınacak / atlanacak ürünler, en sık bölümler
+python scripts/setup_data.py feed                 # eşitle + vektörler + bölüm ayarları
+```
+
+- Google Shopping XML (`g:` alanları, eşleme gerekmez) ve CSV (sütunlar `[feeds.columns]` ile eşlenir) desteklenir.
+- Bölüm, ürün türü ve renk feed'in kategori yolundan, cinsiyet / yaş alanlarından ve ürün adından Türkçe ve İngilizce anahtar kelimelerle çıkarılır ("Kadın > Giyim > Elbise" → Women / Dress, "Lacivert" → Navy Blue). Moda dışı ürünler ve cinsiyeti bulunamayan giyim ürünleri alınmaz. H&M'den kurulan bir deneme feed'inde bölüm ve alt kategori etiketleri ürünlerin ~%94'ünde H&M'in kendi etiketleriyle aynı çıktı (cinsiyet hatası yok; farkların çoğu sandaletin "ayakkabı" yerine "sandalet" sayılması gibi alt kategori ayrıntıları).
+- Feed adresleri çoğu zaman kişisel affiliate anahtarı içerir, bu yüzden `config/feeds.toml` git dışındadır. Yalnızca kullanım hakkınız olan feed'leri kullanın; proje mağaza sitelerini kazımaz (scraping).
 
 **`products` kurulumu** (~4 GB disk): `scripts/import_products.py` dosyasının başındaki komutla Hugging Face'teki 384×512 kopyayı (`benitomartin/fashion-product-images-small-384x512`, 5 parquet dosyası, 2 GB) `data/products/raw/` altına indirin, sonra:
 

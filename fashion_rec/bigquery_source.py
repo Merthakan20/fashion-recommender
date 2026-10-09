@@ -173,10 +173,10 @@ def download_images(rows: list[dict[str, str]], out_dir: Path, reader=read_image
     return sorted(ok, key=lambda r: r["file"])
 
 
-def write_metadata(rows: list[dict[str, str]], out_dir: Path) -> Path:
+def write_metadata(rows: list[dict[str, str]], out_dir: Path, fields: list[str] = FIELDS) -> Path:
     path = out_dir / "metadata.csv"
     with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["file", *FIELDS, "image"])
+        writer = csv.DictWriter(f, fieldnames=["file", *fields, "image"])
         writer.writeheader()
         writer.writerows(rows)
     return path

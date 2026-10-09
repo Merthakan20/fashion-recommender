@@ -17,10 +17,11 @@ Pick a product, upload a photo or describe what you want (in Turkish or English)
 - **"Like this, but red"** — combine an image with a text modifier.
 - **Outfit suggestions** — complementary pieces (top → bottom + shoes + accessory), learned from real H&M purchases and backed by rules for new products.
 - **Frequently bought together** — from 1M+ shopping baskets.
+- **Other brands** — a "From other brands" tab shows the closest products from partner brands' product feeds (affiliate / Google Shopping), one row per brand, with price and a link to the store.
 - **Segments** — Women / Men / Girls / Boys / Accessories, each with its own tuned settings; recommendations stay in the query's segment.
 - **Turkish support** — a fashion glossary fixes CLIP's Turkish vocabulary gaps ("kemer" → belt).
 - **Quality controls** — diversity re-ranking (no near-duplicate listings), hides products whose only photo is a cropped close-up, similarity shown as a calibrated percentage.
-- **Data sources** — Fashion Product Images (44k), H&M (26k + purchases), or your own **BigQuery** catalogue (read-only, cost-guarded).
+- **Data sources** — Fashion Product Images (44k), H&M (26k + purchases), your own **BigQuery** catalogue (read-only, cost-guarded), or brands' **product feeds**.
 - **Ships as Docker** — one command to build, one to prepare a dataset, one to run.
 
 ## How it works
@@ -83,6 +84,16 @@ python scripts/setup_data.py bq
 
 Read-only; table/column names are validated; a `--max-gb` guard stops expensive queries.
 
+### Products from other brands (product feeds)
+
+```bash
+cp config/feeds.example.toml config/feeds.toml   # one [[feeds]] block per brand: feed URL or file, format
+python scripts/sync_feeds.py --dry-run            # per brand: products kept / skipped, most common sections
+python scripts/setup_data.py feed
+```
+
+Brands publish their catalogues as product feeds through affiliate networks (Admitad, Awin, Trendyol / Hepsiburada affiliate programmes…) or Google Merchant Center. Google Shopping XML and CSV are supported; categories and colours are mapped from Turkish or English keywords ("Kadın > Giyim > Elbise" → Women / Dress, "Lacivert" → Navy Blue), and non-fashion items are skipped. Once the `feed` dataset exists, every other dataset gets a **"From other brands"** tab for both catalogue items and uploaded photos; the `feed` dataset can also be opened on its own, with a brand filter. Only use feeds you have the right to use — the project does not scrape store websites.
+
 ## Datasets & licences
 
 | Dataset | Source | Notes |
@@ -98,10 +109,10 @@ The code is MIT-licensed ([LICENSE](LICENSE)); dataset images remain the propert
 ```
 fashion_rec/          core package: embeddings, search, outfits, co-purchase, calibration, BigQuery …
 app.py                Streamlit UI
-scripts/              dataset setup / import, tuning, evaluation, BigQuery sync
+scripts/              dataset setup / import, tuning, evaluation, BigQuery / product-feed sync
 notebooks/            experiments and evaluations (model, pooling, colour, tags, diversity, outfits)
-tests/                157 tests (no model / network needed — fake models and clients)
-config/               bigquery.example.toml
+tests/                201 tests (no model / network needed — fake models and clients)
+config/               bigquery.example.toml, feeds.example.toml
 Dockerfile, docker-compose.yml
 ```
 

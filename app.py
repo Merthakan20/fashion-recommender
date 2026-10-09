@@ -8,9 +8,11 @@ import re
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import quote
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")  # TensorFlow log kalabalığını gizle
 
+import numpy as np  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from fashion_rec.backbone import build_image_index, clip_encoder  # noqa: E402
@@ -25,6 +27,7 @@ from fashion_rec.config import IMAGE_EXTENSIONS  # noqa: E402
 from fashion_rec.copurchase import PURCHASE_WEIGHTS, bought_together, load_copurchase  # noqa: E402
 from fashion_rec.data import catalog_index  # noqa: E402
 from fashion_rec.diversity import mmr  # noqa: E402
+from fashion_rec.feed_source import best_per_brand  # noqa: E402
 from fashion_rec.glossary import gender_in_query, translate  # noqa: E402
 from fashion_rec.outfit import OutfitCatalog, Weights, clip_roles, infer_row  # noqa: E402
 from fashion_rec.photo import build_photo_index, partial_names  # noqa: E402
@@ -158,6 +161,14 @@ def label(path: Path) -> str:
     return display_name(path, get_metadata())
 
 
+def show_store(row: dict[str, str]) -> None:
+    """Ürün feed'inden gelen ürünlerde fiyat ve mağaza bağlantısı (diğer veri setlerinde bir şey göstermez)."""
+    if not row.get("url"):
+        return
+    url = quote(row["url"], safe=":/?&=%#+,;@!$*~-._")  # parantez vb. Markdown bağlantısını bozmasın
+    st.markdown(" · ".join(x for x in (row.get("price", ""), f"[Mağazada gör ↗]({url})") if x))
+
+
 @contextmanager
 def uploaded_file(uploaded):
     """Yüklenen dosyayı geçici olarak diske yazar, iş bitince siler."""
@@ -249,6 +260,7 @@ def show_outfit(image_path, uploaded):
                 st.image(str(path), width="stretch")
                 st.markdown(label(path))
                 st.caption(" · ".join(tag_lookup[path.name].values()))
+                show_store(get_metadata().get(path.name, {}))
 
 
 def show_bought_together(image_path, uploaded):
@@ -269,6 +281,61 @@ def show_bought_together(image_path, uploaded):
                 st.image(str(path), width="stretch")
                 st.markdown(label(path))
                 st.caption(" · ".join(tag_lookup[path.name].values()) + f"  \n{count} sepette birlikte alındı")
+
+
+PARTNER_DATASET = "feed"
+
+
+@st.cache_resource(show_spinner="Diğer markaların kataloğu hazırlanıyor...")
+def get_partner_index():
+    """Marka feed'lerinden kurulan "feed" veri seti: (yollar, CLIP vektörleri, metadata, bölümler).
+
+    İndirilmemişse ya da açık veri seti zaten buysa None (o zaman öneriler zaten markalardan gelir).
+    Vektörler `setup_data.py feed` ile hesaplanır; görsel modeli hangi veri seti açık olursa olsun aynı CLIP.
+    """
+    data_dir = config.DATASETS[PARTNER_DATASET]
+    if config.DATASET == PARTNER_DATASET or not (data_dir / config.METADATA_FILE).exists():
+        return None
+    partner_paths, partner_features = build_text_index(
+        data_dir, config.PROJECT_ROOT / "cache" / PARTNER_DATASET / "clip_features.npz")
+    metadata = load_metadata(data_dir)
+    return partner_paths, partner_features, metadata, dict(zip((p.name for p in partner_paths),
+                                                               segments(partner_paths, metadata)))
+
+
+def show_partner_brands(image_path, uploaded):
+    """Seçilen / yüklenen ürüne en çok benzeyen ürünler, marka başına bir satır (fiyat ve mağaza bağlantısıyla)."""
+    partner_paths, partner_features, partner_meta, partner_segments = get_partner_index()
+    if modifier:
+        results = combined_search(image_path, modifier, partner_paths, partner_features, top_n=len(partner_paths),
+                                  text_weight=text_weight, model=get_clip_model())
+    else:
+        # katalogdaki ürünün CLIP vektörü önbellekte; yüklenen görsel (veya VGG16 veri seti dışı) kodlanır
+        clip_paths, clip_features = (paths, features) if config.IMAGE_BACKBONE == "clip" else get_text_index()
+        vector = None if uploaded else query_vector(image_path, clip_paths, clip_features)
+        if vector is None:
+            vector = clip_encoder(get_clip_model())([image_path])[0]
+        similarities = partner_features @ vector
+        results = [(partner_paths[i], float(similarities[i])) for i in np.argsort(-similarities)]
+    if segment and same_segment:
+        results = [(p, s) for p, s in results if partner_segments.get(p.name) in compatible_segments(segment)]
+    groups = best_per_brand(results, {name: row.get("brand", "") for name, row in partner_meta.items()},
+                            per_brand=GRID_COLUMNS)
+    if not groups:
+        st.info("Diğer markaların kataloğunda bu bölümden ürün yok.")
+        return
+    st.caption("Markaların ürün feed'lerinden en benzer ürünler; markalar en iyi eşleşmelerine göre sıralı. "
+               "Fiyatlar feed'in son eşitlendiği zamana aittir (`scripts/sync_feeds.py`)."
+               + (f" Değişiklik: “{modifier}”." if modifier else ""))
+    for brand, items in groups.items():
+        st.markdown(f"**{brand}**")
+        for col, (path, _) in zip(st.columns(GRID_COLUMNS), items):
+            with col:
+                row = partner_meta.get(path.name, {})
+                st.image(str(path), width="stretch")
+                st.markdown(display_name(path, partner_meta))
+                st.caption(" · ".join(x for x in (row.get("articleType", ""), row.get("baseColour", "")) if x))
+                show_store(row)
 
 
 def query_vector(image_path, index_paths, index_features):
@@ -321,6 +388,7 @@ def show_grid(results, scale):
                 st.image(str(path), width="stretch")
                 st.markdown(f"**{rank}.** {label(path)}")
                 st.caption(" · ".join(tag_lookup[path.name].values()))
+                show_store(get_metadata().get(path.name, {}))
                 pct = scale(score)
                 st.progress(pct / 100, text=f"Benzerlik: {percent_text(pct)}")
 
@@ -348,7 +416,7 @@ st.caption("Bir kıyafet seçin, yükleyin veya tarif edin; en çok benzeyen kı
 # Veri seti seçici: değişince yalnız veri setine bağlı önbellekler temizlenir (CLIP / VGG16 modelleri kalır)
 DATASET_CACHES = [get_index, get_metadata, get_tag_lookup, get_filter_options, get_segment_lookup,
                   get_color_features, get_text_index, get_image_scale, get_text_scale, get_combined_scale,
-                  get_outfit_catalog, get_partial_names]
+                  get_outfit_catalog, get_partial_names, get_partner_index]
 datasets = config.available_datasets()
 with st.sidebar:
     chosen = st.selectbox("Veri seti", datasets, index=datasets.index(config.DATASET) if config.DATASET in datasets else 0,
@@ -464,12 +532,17 @@ else:
                 st.caption("Bu ürünün veri setindeki tek fotoğrafı ürünü tam göstermiyor (kırpık / yakın çekim).")
         with right:
             catalog = get_outfit_catalog()
-            if catalog is None:
-                similar_tab, outfit_tab, bought_tab = st.container(), None, None
-            elif catalog.copurchase is not None:
-                similar_tab, outfit_tab, bought_tab = st.tabs(["Benzer ürünler", "Kombin önerisi", "Birlikte alınanlar"])
+            extra_tabs = []  # (başlık, gösterim fonksiyonu): veri setinde olanlar
+            if catalog is not None:
+                extra_tabs.append(("Kombin önerisi", show_outfit))
+                if catalog.copurchase is not None:
+                    extra_tabs.append(("Birlikte alınanlar", show_bought_together))
+            if get_partner_index() is not None:
+                extra_tabs.append(("Diğer markalardan", show_partner_brands))
+            if extra_tabs:
+                similar_tab, *tabs = st.tabs(["Benzer ürünler", *(title for title, _ in extra_tabs)])
             else:
-                (similar_tab, outfit_tab), bought_tab = st.tabs(["Benzer ürünler", "Kombin önerisi"]), None
+                similar_tab, tabs = st.container(), []
             with similar_tab:
                 st.subheader(f"Öneriler: bunun gibi ama “{modifier}”" if modifier else "Öneriler")
                 if modifier and translate(modifier):
@@ -478,9 +551,7 @@ else:
                 scale = (get_combined_scale(text_weight, scale_segment) if modifier
                          else get_image_scale(color_weight, scale_segment))
                 show_grid(results, scale)
-            for tab, show in ((outfit_tab, show_outfit), (bought_tab, show_bought_together)):
-                if tab is None:
-                    continue
+            for tab, (_, show) in zip(tabs, extra_tabs):
                 with tab:
                     if isinstance(query_image, Path):
                         show(query_image, uploaded=False)

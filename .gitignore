@@ -11,5 +11,8 @@ cache/
 notebooks/products_eval_cache.npz
 data/hm/
 data/bq/
+data/feed/
 # BigQuery ayarları proje / tablo adı içerir; örneği git'te: config/bigquery.example.toml
 config/bigquery.toml
+# feed adresleri affiliate anahtarı içerebilir; örneği git'te: config/feeds.example.toml
+config/feeds.toml
