@@ -92,6 +92,9 @@ def test_parse_csv_maps_columns():
     ({"product_type": "Giyim > Kadın > Ceket", "title": "Kemerli Trençkot"}, ("Apparel", "Topwear", "Jackets")),
     ({"title": "ELBİSE"}, ("Apparel", "Dress", "Dresses")),                 # Türkçe büyük harf
     ({"title": "Ribbed Vest Top"}, ("Apparel", "Topwear", "Tops")),        # İngiltere'de "vest" = atlet
+    ({"title": "Keten Tunik"}, ("Apparel", "Topwear", "Tunics")),
+    ({"title": "Denim Salopet"}, ("Apparel", "Dress", "Jumpsuit")),          # "denim" ama kot pantolon değil
+    ({"title": "Kapri Pantolon"}, ("Apparel", "Bottomwear", "Trousers")),
     ({"title": "Eşofman Takımı"}, ("Apparel", "Apparel Set", "Sets")),
     ({"title": "Gümüş Yüzük"}, ("Accessories", "Jewellery", "Jewellery")),
     ({"title": "Earring Set"}, ("Accessories", "Jewellery", "Jewellery")),   # takı seti, giyim takımı değil

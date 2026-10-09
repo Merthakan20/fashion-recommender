@@ -219,7 +219,8 @@ fashion-recommender/
 │   ├── segment_settings.json # scripts/tune_segments.py çıktısı
 │   ├── photo.py          # kırpık / yakın çekim fotoğraf tespiti
 │   ├── bigquery_source.py    # BigQuery'den katalog / satış okuma
-│   └── feed_source.py        # markaların ürün feed'leri (Google Shopping XML / CSV)
+│   ├── feed_source.py        # markaların ürün feed'leri (Google Shopping XML / CSV)
+│   └── store_links.py        # "Mağazalarda ara": ürünün Türkçe tarifiyle mağaza arama bağlantıları
 ├── app.py                # Streamlit arayüzü
 ├── scripts/              # veri seti hazırlama (setup_data.py), içe aktarma, ayar / eğitim scriptleri
 ├── config/               # bigquery.example.toml, feeds.example.toml (doldurulmuş halleri git dışında)
@@ -287,6 +288,8 @@ python scripts/setup_data.py feed                 # eşitle + vektörler + böl�
 - Google Shopping XML (`g:` alanları, eşleme gerekmez) ve CSV (sütunlar `[feeds.columns]` ile eşlenir) desteklenir.
 - Bölüm, ürün türü ve renk feed'in kategori yolundan, cinsiyet / yaş alanlarından ve ürün adından Türkçe ve İngilizce anahtar kelimelerle çıkarılır ("Kadın > Giyim > Elbise" → Women / Dress, "Lacivert" → Navy Blue). Moda dışı ürünler ve cinsiyeti bulunamayan giyim ürünleri alınmaz. H&M'den kurulan bir deneme feed'inde bölüm ve alt kategori etiketleri ürünlerin ~%94'ünde H&M'in kendi etiketleriyle aynı çıktı (cinsiyet hatası yok; farkların çoğu sandaletin "ayakkabı" yerine "sandalet" sayılması gibi alt kategori ayrıntıları).
 - Feed adresleri çoğu zaman kişisel affiliate anahtarı içerir, bu yüzden `config/feeds.toml` git dışındadır. Yalnızca kullanım hakkınız olan feed'leri kullanın; proje mağaza sitelerini kazımaz (scraping).
+
+**Mağazalarda ara** (`fashion_rec/store_links.py`): seçilen ya da yüklenen ürün, etiketlerinden Türkçe tarif edilir ("kadın siyah elbise"; yüklenen görselde etiketler en yakın komşulardan tahmin edilir). Tarif düzenlenebilir. Altındaki bağlantılar Zara, LCW, DeFacto, Koton, Mavi, H&M ve Trendyol'un kendi arama sayfalarını açar. Sitelerden veri çekilmez, sonuçları mağazanın metin araması getirir. Bu yüzden görsel benzerlik değil, tarife uyan ürünler gelir. Tarif H&M ürünlerinin %99,9'unda, 44 bin ürünlük veri setinde giyim, ayakkabı ve aksesuarların %98'inde kurulabiliyor (sari gibi karşılığı olmayan türlerde kutu boş gelir, elle yazılabilir). Arama adresleri Ekim 2026'da tarayıcıda denendi; bir site adresini değiştirirse `STORES` listesi güncellenmelidir.
 
 **`products` kurulumu** (~4 GB disk): `scripts/import_products.py` dosyasının başındaki komutla Hugging Face'teki 384×512 kopyayı (`benitomartin/fashion-product-images-small-384x512`, 5 parquet dosyası, 2 GB) `data/products/raw/` altına indirin, sonra:
 

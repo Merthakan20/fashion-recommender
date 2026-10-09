@@ -227,7 +227,7 @@ def infer_row(neighbours: list[tuple[Path, float]], metadata: Metadata, k: int =
     from collections import Counter
 
     row = {}
-    for field in ("subCategory", "gender", "usage", "season", "baseColour", "masterCategory"):
+    for field in ("subCategory", "articleType", "gender", "usage", "season", "baseColour", "masterCategory"):
         values = Counter(metadata.get(p.name, {}).get(field, "") for p, _ in neighbours[:k])
         values.pop("", None)
         if values:

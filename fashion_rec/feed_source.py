@@ -129,23 +129,26 @@ _CATEGORY_RULES = [
     (r"kolye|küpe|bileklik|yüzük|\btakı\b|necklace|earrings?|bracelets?|\brings?\b|jewel", "Accessories", "Jewellery",
      "Jewellery"),                                                           # "takım" takı değil
     (r"şapka|\bbere\b|kasket|\bhats?\b|\bcaps?\b|beanie", "Accessories", "Headwear", "Caps"),
-    (r"\batkı|\bşal\b|eşarp|fular|scarf|scarves", "Accessories", "Scarves", "Scarves"),   # "şalvar" değil
+    (r"\batkı|\bşal\b|eşarp|fular|scarf|scarves|\bstoles?\b|mufflers?", "Accessories", "Scarves", "Scarves"),   # "şalvar" değil
     (r"kravat|\bties?\b", "Accessories", "Ties", "Ties"),
+    (r"kol düğme|cufflinks?", "Accessories", "Cufflinks", "Cufflinks"),
     (r"eldiven|\bgloves?\b", "Accessories", "Gloves", "Gloves"),
-    (r"iç giyim|sütyen|külot|boxer|pijama|underwear|lingerie|\bbra\b|nightwear|pyjama", "Apparel", "Innerwear",
+    (r"iç giyim|sütyen|külot|boxer|pijama|sabahlık|bornoz|underwear|lingerie|\bbra\b|nightwear|pyjama|\brobe\b"
+     r"|\bbriefs\b|\btrunks?\b|camisole", "Apparel", "Innerwear",
      "Innerwear"),
     (r"çorap|\bsocks?\b", "Apparel", "Socks", "Socks"),
     (r"mayo|bikini|swim", "Apparel", "Swimwear", "Swimwear"),
     (r"takım elbise|\bsuits?\b", "Apparel", "Apparel Set", "Suits"),
     (r"\btakımı?\b|garment set|\bsets?\b", "Apparel", "Apparel Set", "Sets"),   # eşofman takımı, alt-üst set
-    (r"tulum|jumpsuit|overall", "Apparel", "Dress", "Jumpsuit"),
+    (r"tulum|salopet|jumpsuit|overall|dungarees", "Apparel", "Dress", "Jumpsuit"),
     (r"elbise|\bdress(es)?\b", "Apparel", "Dress", "Dresses"),
-    (r"ceket|blazer|yelek|jackets?|\bvests?\b(?! tops?)", "Apparel", "Topwear", "Jackets"),
+    (r"ceket|blazer|yelek|waistcoat|jackets?|\bvests?\b(?! tops?)", "Apparel", "Topwear", "Jackets"),
     (r"\bmont|kaban|parka|trençkot|\bcoats?\b", "Apparel", "Topwear", "Coats"),
     (r"kazak|hırka|triko|sweaters?|cardigans?|knitwear", "Apparel", "Topwear", "Sweaters"),
     (r"sweatshirt|hoodie|kapüşonlu", "Apparel", "Topwear", "Sweatshirts"),
     (r"t-?shirt|tişört|tisort|\bpolo\b", "Apparel", "Topwear", "Tshirts"),   # gömlekten önce: "t-shirt" ⊃ "shirt"
     (r"gömlek|\bshirts?\b", "Apparel", "Topwear", "Shirts"),
+    (r"tunik|tunics?|\bkurt[ai]s?\b", "Apparel", "Topwear", "Tunics"),
     (r"\bbluz|blouses?|\btops?\b|\bcrop\b|atlet|büstiyer|\btank\b|\bbody\b|bodysuit", "Apparel", "Topwear",
      "Tops"),
     (r"\betek|skirts?", "Apparel", "Bottomwear", "Skirts"),               # kottan önce: "kot etek" etektir
@@ -153,7 +156,7 @@ _CATEGORY_RULES = [
     (r"\bkot\b|\bjeans?\b|denim", "Apparel", "Bottomwear", "Jeans"),
     (r"\btayt|leggings?", "Apparel", "Bottomwear", "Leggings"),
     (r"eşofman alt|jogger|track ?pants?", "Apparel", "Bottomwear", "Track Pants"),
-    (r"pantolon|trousers?|\bpants\b|chino", "Apparel", "Bottomwear", "Trousers"),
+    (r"pantolon|trousers?|\bpants\b|chino|kapri|capris?", "Apparel", "Bottomwear", "Trousers"),
 ]
 _CATEGORY_PATTERNS = [(re.compile(p, re.IGNORECASE), m, s, a) for p, m, s, a in _CATEGORY_RULES]
 

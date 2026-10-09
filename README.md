@@ -18,6 +18,7 @@ Pick a product, upload a photo or describe what you want (in Turkish or English)
 - **Outfit suggestions** — complementary pieces (top → bottom + shoes + accessory), learned from real H&M purchases and backed by rules for new products.
 - **Frequently bought together** — from 1M+ shopping baskets.
 - **Other brands** — a "From other brands" tab shows the closest products from partner brands' product feeds (affiliate / Google Shopping), one row per brand, with price and a link to the store.
+- **Search in stores** — the selected or uploaded item is described in Turkish from its labels ("kadın siyah elbise", editable) with links to the search pages of Zara, LCW, DeFacto, Koton, Mavi, H&M and Trendyol. Nothing is scraped; the store's own text search returns the results.
 - **Segments** — Women / Men / Girls / Boys / Accessories, each with its own tuned settings; recommendations stay in the query's segment.
 - **Turkish support** — a fashion glossary fixes CLIP's Turkish vocabulary gaps ("kemer" → belt).
 - **Quality controls** — diversity re-ranking (no near-duplicate listings), hides products whose only photo is a cropped close-up, similarity shown as a calibrated percentage.
@@ -111,7 +112,7 @@ fashion_rec/          core package: embeddings, search, outfits, co-purchase, ca
 app.py                Streamlit UI
 scripts/              dataset setup / import, tuning, evaluation, BigQuery / product-feed sync
 notebooks/            experiments and evaluations (model, pooling, colour, tags, diversity, outfits)
-tests/                201 tests (no model / network needed — fake models and clients)
+tests/                217 tests (no model / network needed — fake models and clients)
 config/               bigquery.example.toml, feeds.example.toml
 Dockerfile, docker-compose.yml
 ```

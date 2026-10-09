@@ -32,6 +32,7 @@ from fashion_rec.glossary import gender_in_query, translate  # noqa: E402
 from fashion_rec.outfit import OutfitCatalog, Weights, clip_roles, infer_row  # noqa: E402
 from fashion_rec.photo import build_photo_index, partial_names  # noqa: E402
 from fashion_rec.segment_settings import load_settings, setting  # noqa: E402
+from fashion_rec.store_links import search_query, store_links  # noqa: E402
 from fashion_rec.features import load_model  # noqa: E402
 from fashion_rec.recommend import recommend  # noqa: E402
 from fashion_rec.tags import TAG_GROUPS, build_tag_index, filter_results, tags_by_name  # noqa: E402
@@ -338,6 +339,17 @@ def show_partner_brands(image_path, uploaded):
                 show_store(row)
 
 
+def show_store_search(row, key):
+    """Seçilen ürünün tarifiyle mağazaların kendi arama sayfalarına bağlantılar (sitelerden veri çekilmez)."""
+    query = st.text_input("Mağazalarda ara", value=search_query(row), key=f"store_query_{key}",
+                          placeholder="ör. kadın siyah elbise",
+                          help="Ürünün etiketlerinden kurulan tarif; düzenlenebilir. Bağlantılar mağazaların kendi "
+                               "arama sayfalarını açar: sonuçlar görsel benzerlik değil, mağazanın metin aramasıdır.")
+    links = store_links(query)
+    if links:
+        st.markdown(" · ".join(f"[{store}]({url})" for store, url in links))
+
+
 def query_vector(image_path, index_paths, index_features):
     """Katalogdaki sorgunun vektörü (çeşitlilikte "aynı ürün" tespiti için); yüklenen görselde None."""
     row = catalog_index(index_paths)[1].get(image_path)
@@ -481,13 +493,18 @@ else:
     else:
         query_image = st.file_uploader("Görsel yükle", type=[ext.lstrip(".") for ext in IMAGE_EXTENSIONS])
 
-    segment = None
+    segment, store_row = None, {}
     if query_image is not None:
         if isinstance(query_image, Path):
             segment = query_segment(query_image)
+            store_row = dict(get_metadata().get(query_image.name, {}))
+            if store_row:
+                store_row["gender"] = corrected_gender(store_row)
         else:
             with uploaded_file(query_image) as tmp_path:
                 segment = query_segment(tmp_path)
+                if get_metadata():  # yüklenen görselin etiketleri en yakın komşulardan
+                    store_row = infer_row(find_similar(tmp_path, "", 20, 0.5, 0.0), get_metadata())
     tuned_color = setting(segment, "color_weight", segment_settings)
 
     modifier_col, text_col, color_col = st.columns([3, 1, 1])
@@ -530,6 +547,7 @@ else:
                 st.caption(f"Bölüm: **{segment}**" + ("" if isinstance(query_image, Path) else " (tahmin)"))
             if isinstance(query_image, Path) and query_image.name in get_partial_names():
                 st.caption("Bu ürünün veri setindeki tek fotoğrafı ürünü tam göstermiyor (kırpık / yakın çekim).")
+            show_store_search(store_row, query_image.name)
         with right:
             catalog = get_outfit_catalog()
             extra_tabs = []  # (başlık, gösterim fonksiyonu): veri setinde olanlar
